@@ -15,4 +15,9 @@ export const RenderConfig = {
   RENDER_STYLE: 'sketch' as 'smooth' | 'sketch',
   CAMERA_ZOOM_DESKTOP: 1.0,
   CAMERA_ZOOM_MOBILE: 0.8, // Zoom out more on mobile to see the battlefield
+  
+  // Texture loading configuration
+  TEXTURE_LOAD_RETRY_COUNT: 3,
+  TEXTURE_LOAD_RETRY_DELAY_MS: 100,
+  TEXTURE_LOAD_TIMEOUT_MS: 5000,
 } as const;
