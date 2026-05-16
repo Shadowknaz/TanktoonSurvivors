@@ -4,6 +4,9 @@ import { UpgradeId, UPGRADE_OPTIONS, UpgradeOption } from "../config/Upgrades";
 import { RandomUtils } from "../utils/RandomUtils";
 import { GameState } from "../models/types";
 import { InputViewModel } from "../viewmodels/InputViewModel";
+import { UpgradeUtils } from "../utils/UpgradeUtils";
+import { EventBus } from "../core/EventBus";
+import { UpgradesChangedEvent } from "../models/events";
 
 export interface PerkEffect {
   type: "damage" | "health" | "speed" | "fireRate" | "other";
@@ -56,20 +59,7 @@ interface GameStore {
   totalKills: number;
   timeScale: number;
   timeScaleDuration: number;
-  playerStats: {
-    speed: number;
-    damage: number;
-    fireRateMultiplier: number;
-    maxHealth: number;
-    deflectionChance: number;
-    hasAutoGun: boolean;
-    explosiveRadius: number;
-    multishotCount: number;
-    lifeStealChance: number;
-    pierceCount: number;
-    evasionChance: number;
-    critChance: number;
-  };
+  // playerStats removed, managed by ECS PlayerStats component
   inputViewModel: InputViewModel | null;
 
   // Derived getters
@@ -98,6 +88,7 @@ interface GameStore {
   updateTimeScale: (dt: number) => void;
   setFps: (fps: number) => void;
   setInputViewModel: (input: InputViewModel) => void;
+  addItemToInventory: (itemId: string, amount?: number) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -129,20 +120,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   totalKills: 0,
   timeScale: 1.0,
   timeScaleDuration: 0,
-  playerStats: {
-    speed: GameConfig.PLAYER_SPEED,
-    damage: GameConfig.PLAYER_BASE_DAMAGE, // base damage
-    fireRateMultiplier: 1.0,
-    maxHealth: 100,
-    deflectionChance: 0,
-    hasAutoGun: false,
-    explosiveRadius: 0,
-    multishotCount: 0,
-    lifeStealChance: 0,
-    pierceCount: 0,
-    evasionChance: 0,
-    critChance: 0,
-  },
+  // playerStats removed
   inputViewModel: null,
 
   isGameOver: () => get().gameState === GameState.GAME_OVER,
@@ -164,42 +142,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectPerk: (perk) =>
     set((state) => ({ selectedPerks: [...state.selectedPerks, perk] })),
   upgradeWeapon: () => set((state) => ({ weaponLevel: state.weaponLevel + 1 })),
-  resetSession: () =>
-    set(() => ({
-      gameState: GameState.PLAYING,
-      score: 0,
-      survivalTime: 0,
-      currentWave: 1,
-      weaponLevel: 1,
-      selectedPerks: [],
-      playerHealth: 100,
-      playerMaxHealth: 100,
-      cameraShake: 0,
-      playerExp: 0,
-      playerLevel: 1,
-      playerNextLevelExp: 100,
-      currentLevelUpOptions: [],
-      acquiredUpgrades: [],
-      currentSpeed: 0,
-      goldRushTimeLeft: 0,
-      totalKills: 0,
-      timeScale: 1.0,
-      timeScaleDuration: 0,
-      playerStats: { 
-          speed: GameConfig.PLAYER_SPEED, 
-          damage: GameConfig.PLAYER_BASE_DAMAGE, 
-          fireRateMultiplier: 1.0, 
-          maxHealth: 100,
-          deflectionChance: 0,
-          hasAutoGun: false,
-          explosiveRadius: 0,
-          multishotCount: 0,
-          lifeStealChance: 0,
-          pierceCount: 0,
-          evasionChance: 0,
-          critChance: 0,
-      },
-    })),
+  resetSession: () => set(() => {
+      EventBus.publish(new UpgradesChangedEvent([], []));
+      return {
+          gameState: GameState.PLAYING,
+          score: 0,
+          survivalTime: 0,
+          currentWave: 1,
+          weaponLevel: 1,
+          selectedPerks: [],
+          playerHealth: 100,
+          playerMaxHealth: 100,
+          cameraShake: 0,
+          playerExp: 0,
+          playerLevel: 1,
+          playerNextLevelExp: 100,
+          currentLevelUpOptions: [],
+          acquiredUpgrades: [],
+          inventory: [],
+          currentSpeed: 0,
+          goldRushTimeLeft: 0,
+          totalKills: 0,
+          timeScale: 1.0,
+          timeScaleDuration: 0,
+      };
+  }),
   setPlayerHealth: (health, maxHealth) => set((state) => {
       const isDead = health <= 0;
       return {
@@ -234,12 +201,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           newGameState = GameState.LEVEL_UP;
           newExp -= nextLevelExp;
           
-          // Filter out maxed upgrades
-          const availableOptions = UPGRADE_OPTIONS.filter(opt => {
-              const acq = state.acquiredUpgrades.find(u => u.option.id === opt.id);
-              if (!acq) return true;
-              return !opt.maxLevels || acq.count < opt.maxLevels;
-          });
+          // Get available upgrades using UpgradeUtils (Synergies & Max Levels handled)
+          const availableOptions = UpgradeUtils.getAvailableUpgrades(state.acquiredUpgrades, state.inventory);
 
           // Generate 3 random distinct upgrades
           const shuffled = [...availableOptions].sort(() => 0.5 - RandomUtils.random());
@@ -248,60 +211,72 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return { playerExp: newExp, gameState: newGameState, currentLevelUpOptions: newOptions };
   }),
   endLevelUp: (chosenUpgrade) => set((state) => {
-      const stats = { ...state.playerStats };
       let hp = state.playerHealth;
       let maxHp = state.playerMaxHealth;
       
-      const acquired = [...state.acquiredUpgrades];
-      const existing = acquired.find(u => u.option.id === chosenUpgrade);
+      let acquired = [...state.acquiredUpgrades];
+      const existingIndex = acquired.findIndex(u => u.option.id === chosenUpgrade);
       
       const option = UPGRADE_OPTIONS.find(o => o.id === chosenUpgrade);
       if (!option) return state; // Invalid option
       
-      if (existing) {
-          existing.count += 1;
+      if (existingIndex !== -1) {
+          acquired = [
+              ...acquired.slice(0, existingIndex),
+              { ...acquired[existingIndex], count: acquired[existingIndex].count + 1 },
+              ...acquired.slice(existingIndex + 1)
+          ];
       } else {
           acquired.push({ option, count: 1 });
       }
 
-      // Process defined effects declaratively
+      let updatedAcquired = [...acquired];
+      let updatedInventory = [...state.inventory];
+
+      // Process inventory/upgrade removal declaratively
       for (const effect of option.effects) {
           switch (effect.type) {
-              case 'maxHealthAdd':
-                  stats.maxHealth += (effect.value ?? 0);
-                  maxHp = stats.maxHealth;
-                  break;
-              case 'heal':
-                  hp = Math.min(hp + (effect.value ?? 0), maxHp);
-                  break;
-              case 'setTrue':
-                  if (effect.stat) {
-                      (stats as any)[effect.stat] = true;
+              case 'removeUpgrade':
+                  if (effect.upgradeId) {
+                      updatedAcquired = updatedAcquired.filter(u => u.option.id !== effect.upgradeId);
                   }
                   break;
-              case 'statAdd':
-                  if (effect.stat && effect.value !== undefined) {
-                      const currentVal = (stats as any)[effect.stat] as number;
-                      let newVal = currentVal + effect.value;
-                      if (effect.maxValue !== undefined) {
-                          newVal = Math.min(newVal, effect.maxValue);
-                      }
-                      (stats as any)[effect.stat] = newVal;
+              case 'removeItem':
+                  if (effect.itemId) {
+                      updatedInventory = updatedInventory.filter(i => i.id !== effect.itemId);
                   }
                   break;
           }
       }
 
-      return { 
+      const newState = { 
           gameState: GameState.PLAYING, 
           playerLevel: state.playerLevel + 1,
           playerNextLevelExp: Math.floor(state.playerNextLevelExp * 1.5),
-          playerStats: stats,
-          playerHealth: Math.min(hp, maxHp),
-          playerMaxHealth: maxHp,
           currentLevelUpOptions: [],
-          acquiredUpgrades: acquired,
+          acquiredUpgrades: updatedAcquired,
+          inventory: updatedInventory,
       };
+      
+      EventBus.publish(new UpgradesChangedEvent(updatedAcquired, updatedInventory));
+      
+      return newState;
+  }),
+  addItemToInventory: (itemId, amount = 1) => set((state) => {
+      let newInventory: InventoryItem[];
+      const existing = state.inventory.find(i => i.id === itemId);
+      
+      if (existing) {
+          newInventory = state.inventory.map(i => 
+              i.id === itemId ? { ...i, quantity: i.quantity + amount } : i
+          );
+      } else {
+          newInventory = [...state.inventory, { id: itemId, name: itemId, quantity: amount }];
+      }
+      
+      EventBus.publish(new UpgradesChangedEvent(state.acquiredUpgrades, newInventory));
+      
+      return { inventory: newInventory };
   }),
   setInputViewModel: (inputViewModel) => set({ inputViewModel })
 }));

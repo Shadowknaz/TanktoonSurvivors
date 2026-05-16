@@ -11,6 +11,8 @@ export interface PlayerStats {
     pierceCount: number;
     evasionChance: number;
     critChance: number;
+    hasNapalmMinigun: boolean;
+    hasVampiricArmor: boolean;
 }
 
 export interface BuffState {
@@ -26,7 +28,6 @@ export interface GameContext {
     isMenu: boolean;
     cameraShake: number;
     screenShakeEnabled: boolean;
-    playerStats: PlayerStats;
     playerHealth: number;
     playerMaxHealth: number;
     currentSpeed: number;

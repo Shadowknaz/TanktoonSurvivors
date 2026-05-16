@@ -21,7 +21,7 @@ export const EventConfig = {
     INVULNERABLE: 1
   },
   LOOT_RADIUS: 20,
-  LOOT_SPEED_BONUS: 20,
+  LOOT_SPEED_BONUS: 10,
   LOOT_SPEED_DURATION: 600, // 10 seconds
   LOOT_INVULN_DURATION: 300, // 5 seconds
 

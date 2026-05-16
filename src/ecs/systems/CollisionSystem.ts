@@ -21,7 +21,8 @@ import {
   Airdrop,
   Detonating,
   FlamerTank,
-  GameState
+  GameState,
+  PlayerStats
 } from "../components";
 import { 
   removeEntity,
@@ -57,6 +58,14 @@ export class CollisionSystem {
     const gameStates = query(world, [GameState]);
     const gs = gameStates[0];
 
+    const players = query(world, [PlayerControlled, PlayerBuffs, PlayerStats]);
+    if (players.length > 0 && ownerType === OwnerType.PLAYER) {
+        const playerEid = players[0];
+        if (PlayerStats.hasAdrenaline[playerEid]) {
+            PlayerBuffs.adrenalineTimer[playerEid] = GameConfig.SYNERGY_ADRENALINE_DURATION_SEC;
+        }
+    }
+
     context.incrementTotalKills();
 
     if (context.goldRushTimeLeft > 0) {
@@ -87,7 +96,9 @@ export class CollisionSystem {
     context.addExp(Math.ceil(GameConfig.ENEMY_XP_REWARD * xpMultiplier));
   }
 
-  static applyAOEDamage(world: World, physicsEngine: PhysicsEngine, cx: number, cy: number, radius: number, damage: number, ownerType: OwnerType, context: GameContext, processed: Set<number> = new Set<number>()) {
+  private static shrapnelProcessedSet = new Set<number>();
+
+  static applyAOEDamage(world: World, physicsEngine: PhysicsEngine, cx: number, cy: number, radius: number, damage: number, ownerType: OwnerType, context: GameContext, processed: Set<number> = new Set<number>(), isShrapnel: boolean = false) {
     const bounds = {
       min: { x: cx - radius, y: cy - radius },
       max: { x: cx + radius, y: cy + radius }
@@ -117,6 +128,9 @@ export class CollisionSystem {
                             (ownerType === 0 && (isEidPlayer || isEidEnemy || isEidLandmine)); 
 
         if (validTarget) {
+            const players = query(world, [PlayerControlled, PlayerStats]);
+            const playerEid = players.length > 0 ? players[0] : -1;
+            
             const ex = Position.x[eid];
             const ey = Position.y[eid];
             if (Math.hypot(ex - cx, ey - cy) <= radius) {
@@ -126,22 +140,45 @@ export class CollisionSystem {
                     if (hasComponent(world, eid, PlayerBuffs) && PlayerBuffs.invulnTimer[eid] > 0) {
                         deflected = true; // i-frames just ignore damage
                     } else {
-                        const defChance = context.playerStats.deflectionChance;
-                        const evaChance = context.playerStats.evasionChance;
+                        const defChance = PlayerStats.deflectionChance[eid];
+                        const evaChance = PlayerStats.evasionChance[eid];
                         if (evaChance > 0 && RandomUtils.random() < evaChance) {
                             evaded = true;
+                            if (PlayerStats.hasPredator[eid]) {
+                                PlayerBuffs.predatorCrit[eid] = 1;
+                            }
                         } else if (defChance > 0 && RandomUtils.random() < defChance) {
                             deflected = true;
+                            if (PlayerStats.hasReactiveArmor[eid]) {
+                                PlayerBuffs.deflectionCount[eid]++;
+                                if (PlayerBuffs.deflectionCount[eid] >= GameConfig.SYNERGY_REACTIVE_ARMOR_DEFLECTIONS_NEEDED) {
+                                    PlayerBuffs.deflectionCount[eid] = 0;
+                                    const h = Health.current[eid] + GameConfig.SYNERGY_REACTIVE_ARMOR_HEAL;
+                                    Health.current[eid] = Math.min(h, Health.max[eid]);
+                                }
+                            }
                         }
                     }
                 }
 
                 if (!deflected && !evaded) {
                     let finalDamage = damage;
-                    if (ownerType === OwnerType.PLAYER) {
-                        if (RandomUtils.random() < context.playerStats.critChance) {
+                    if (ownerType === OwnerType.PLAYER && playerEid !== -1) {
+                        let isCrit = false;
+                        if (PlayerBuffs.predatorCrit[playerEid] === 1) {
+                            isCrit = true;
+                            PlayerBuffs.predatorCrit[playerEid] = 0;
+                        } else if (RandomUtils.random() < PlayerStats.critChance[playerEid]) {
+                            isCrit = true;
+                        }
+
+                        if (isCrit) {
                             finalDamage *= 2.0;
                             EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 40, ComicTextType.BAM);
+                            if (PlayerStats.hasShrapnel[playerEid] && !isShrapnel) {
+                                CollisionSystem.shrapnelProcessedSet.clear();
+                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, CollisionSystem.shrapnelProcessedSet, true);
+                            }
                         }
                     }
 
@@ -149,8 +186,8 @@ export class CollisionSystem {
                     addComponent(world, eid, DamageFlash);
                     DamageFlash.timer[eid] = GameConfig.DAMAGE_FLASH_FRAMES;
                     
-                    if (ownerType === OwnerType.PLAYER && isEidEnemy && context.playerStats.lifeStealChance > 0) {
-                        if (RandomUtils.random() < context.playerStats.lifeStealChance) {
+                    if (ownerType === OwnerType.PLAYER && isEidEnemy && playerEid !== -1 && PlayerStats.lifeStealChance[playerEid] > 0) {
+                        if (RandomUtils.random() < PlayerStats.lifeStealChance[playerEid]) {
                             context.setPlayerHealth(Math.min(context.playerHealth + 5, context.playerMaxHealth), context.playerMaxHealth);
                             EffectFactory.spawnParticleBubble(world, Position.x[eid], Position.y[eid]);
                         }
@@ -322,6 +359,9 @@ export class CollisionSystem {
     const canDamage = (ownerType === OwnerType.PLAYER && isTargetEnemy) ||
                       (ownerType === OwnerType.ENEMY && isTargetPlayer);
 
+    const players = query(world, [PlayerControlled, PlayerStats]);
+    const playerEid = players.length > 0 ? players[0] : -1;
+
     if (isTargetWall && isSourceProjectile) {
         impact = true;
     } else if (isTargetWall && !isSourceProjectile) {
@@ -339,12 +379,23 @@ export class CollisionSystem {
             if (hasComponent(world, targetEid, PlayerBuffs) && PlayerBuffs.invulnTimer[targetEid] > 0) {
                 deflected = true; // i-frames
             } else {
-                const defChance = context.playerStats.deflectionChance;
-                const evaChance = context.playerStats.evasionChance;
+                const defChance = PlayerStats.deflectionChance[targetEid];
+                const evaChance = PlayerStats.evasionChance[targetEid];
                 if (evaChance > 0 && RandomUtils.random() < evaChance) {
                     evaded = true;
+                    if (PlayerStats.hasPredator[targetEid]) {
+                        PlayerBuffs.predatorCrit[targetEid] = 1;
+                    }
                 } else if (defChance > 0 && RandomUtils.random() < defChance) {
                     deflected = true;
+                    if (PlayerStats.hasReactiveArmor[targetEid]) {
+                        PlayerBuffs.deflectionCount[targetEid]++;
+                        if (PlayerBuffs.deflectionCount[targetEid] >= GameConfig.SYNERGY_REACTIVE_ARMOR_DEFLECTIONS_NEEDED) {
+                            PlayerBuffs.deflectionCount[targetEid] = 0;
+                            const h = Health.current[targetEid] + GameConfig.SYNERGY_REACTIVE_ARMOR_HEAL;
+                            Health.current[targetEid] = Math.min(h, Health.max[targetEid]);
+                        }
+                    }
                 }
             }
         }
@@ -400,10 +451,22 @@ export class CollisionSystem {
             impact = true;
         } else {
             let finalDamage = damage;
-            if (ownerType === OwnerType.PLAYER) {
-                if (RandomUtils.random() < context.playerStats.critChance) {
+            if (ownerType === OwnerType.PLAYER && playerEid !== -1) {
+                let isCrit = false;
+                if (PlayerBuffs.predatorCrit[playerEid] === 1) {
+                    isCrit = true;
+                    PlayerBuffs.predatorCrit[playerEid] = 0;
+                } else if (RandomUtils.random() < PlayerStats.critChance[playerEid]) {
+                    isCrit = true;
+                }
+
+                if (isCrit) {
                     finalDamage *= 2.0;
                     EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 40, ComicTextType.BAM); // Visual feedback for crit
+                    if (PlayerStats.hasShrapnel[playerEid]) {
+                        CollisionSystem.shrapnelProcessedSet.clear();
+                        CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[targetEid], Position.y[targetEid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, CollisionSystem.shrapnelProcessedSet, true);
+                    }
                 }
             }
 
@@ -411,8 +474,8 @@ export class CollisionSystem {
             addComponent(world, targetEid, DamageFlash);
             DamageFlash.timer[targetEid] = GameConfig.DAMAGE_FLASH_FRAMES;
             
-            if (ownerType === OwnerType.PLAYER && isTargetEnemy && context.playerStats.lifeStealChance > 0) {
-                if (RandomUtils.random() < context.playerStats.lifeStealChance) {
+            if (ownerType === OwnerType.PLAYER && isTargetEnemy && playerEid !== -1 && PlayerStats.lifeStealChance[playerEid] > 0) {
+                if (RandomUtils.random() < PlayerStats.lifeStealChance[playerEid]) {
                     context.setPlayerHealth(Math.min(context.playerHealth + 5, context.playerMaxHealth), context.playerMaxHealth);
                     EffectFactory.spawnParticleBubble(world, Position.x[targetEid], Position.y[targetEid]);
                 }
@@ -455,6 +518,41 @@ export class CollisionSystem {
             if (isSourceProjectile && hasComponent(world, sourceEid, Pierce) && Pierce.count[sourceEid] > 0 && !isTargetWall) {
                 // Penetrate enemy, don't destroy projectile
                 Pierce.count[sourceEid] -= 1;
+                
+                // Ricochet synergy
+                if (ownerType === OwnerType.PLAYER && playerEid !== -1 && PlayerStats.hasRicochet[playerEid]) {
+                    const enemies = query(world, [Position, AIBehavior]);
+                    let nearestEnemy = -1;
+                    let minDist = Infinity;
+                    const px = Position.x[targetEid];
+                    const py = Position.y[targetEid];
+
+                    for (let i = 0; i < enemies.length; i++) {
+                        const tEnemy = enemies[i];
+                        if (tEnemy === targetEid) continue;
+                        const dx = Position.x[tEnemy] - px;
+                        const dy = Position.y[tEnemy] - py;
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq < minDist) {
+                            minDist = distSq;
+                            nearestEnemy = tEnemy;
+                        }
+                    }
+                    
+                    if (nearestEnemy !== -1) {
+                        const bodyId = MatterBody.bodyId[sourceEid];
+                        const body = physicsEngine.getBodyById(bodyId);
+                        if (body) {
+                            const angle = Math.atan2(Position.y[nearestEnemy] - py, Position.x[nearestEnemy] - px);
+                            const speed = body.speed || GameConfig.PROJECTILE_SPEED_PLAYER;
+                            Matter.Body.setVelocity(body, { 
+                                x: Math.cos(angle) * speed, 
+                                y: Math.sin(angle) * speed 
+                            });
+                            Position.angle[sourceEid] = angle;
+                        }
+                    }
+                }
             } else {
                 if (hasComponent(world, sourceEid, Health)) {
                     Health.current[sourceEid] = 0;

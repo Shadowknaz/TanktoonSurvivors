@@ -160,6 +160,9 @@ export const Detonating = defineComponent({
 export const PlayerBuffs = defineComponent({
   speedTimer: Types.f32,
   invulnTimer: Types.f32,
+  adrenalineTimer: Types.f32,
+  deflectionCount: Types.ui32,
+  predatorCrit: Types.ui8,
 });
 
 export const TankTracks = defineComponent({
@@ -206,4 +209,27 @@ export const GameState = defineComponent({
 export const MapBounds = defineComponent({
   width: Types.f32,
   height: Types.f32,
+});
+
+export const PlayerStats = defineComponent({
+  speed: Types.f32,
+  damage: Types.f32,
+  fireRateMultiplier: Types.f32,
+  maxHealth: Types.f32,
+  deflectionChance: Types.f32,
+  hasAutoGun: Types.ui8,
+  explosiveRadius: Types.f32,
+  multishotCount: Types.ui8,
+  lifeStealChance: Types.f32,
+  pierceCount: Types.ui8,
+  evasionChance: Types.f32,
+  critChance: Types.f32,
+  hasNapalmMinigun: Types.ui8,
+  hasVampiricArmor: Types.ui8,
+  hasRicochet: Types.ui8,
+  hasAdrenaline: Types.ui8,
+  hasShrapnel: Types.ui8,
+  hasReactiveArmor: Types.ui8,
+  hasPredator: Types.ui8,
+  hasAutoVolley: Types.ui8,
 });

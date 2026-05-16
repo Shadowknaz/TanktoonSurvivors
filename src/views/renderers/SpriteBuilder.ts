@@ -166,9 +166,13 @@ export class SpriteBuilder {
   static drawEnemyGrenadier(container: PIXI.Container) {
     const TANK_W = 54;
     const TANK_H = 34; // Wide, low body
+    const TRACK_W = 60;
+    const TRACK_H = 12;
     const BASE_COLOR = 0x5a554a;
     const SHADOW_COLOR = 0x3a352a;
     const HIGHLIGHT_COLOR = 0x7a756a;
+    const TRACK_COLOR = 0x222222;
+    const TRACK_SHADOW = 0x111111;
     
     let chassis = container.getChildByName("chassis") as PIXI.Graphics;
     if (!chassis) {
@@ -178,6 +182,10 @@ export class SpriteBuilder {
     }
     chassis.clear();
     
+    // Tracks
+    SketchUtils.drawComicBlock(chassis, 0, -20, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x444444);
+    SketchUtils.drawComicBlock(chassis, 0, 20, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x444444);
+
     // Low, wide hull
     SketchUtils.drawComicBlock(chassis, 0, 0, TANK_W, TANK_H, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
     
@@ -192,14 +200,21 @@ export class SpriteBuilder {
     // Huge mortar tower (tower block, not just a thin bar)
     SketchUtils.drawComicCylinder(turret, 0, 0, 18, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
     SketchUtils.drawComicBlock(turret, 0, 0, 20, 20, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+
+    // Evil red eye
+    SketchUtils.drawSketchCircle(turret, 10, 0, 5, 0xff0000);
   }
 
   static drawEnemyFlamer(container: PIXI.Container) {
     const TANK_W = 46;
     const TANK_H = 40;
+    const TRACK_W = 54;
+    const TRACK_H = 12;
     const BASE_COLOR = 0x6a2a2a;
     const SHADOW_COLOR = 0x4a1a1a;
     const HIGHLIGHT_COLOR = 0x8a4a4a;
+    const TRACK_COLOR = 0x222222;
+    const TRACK_SHADOW = 0x111111;
     
     let chassis = container.getChildByName("chassis") as PIXI.Graphics;
     if (!chassis) {
@@ -208,14 +223,20 @@ export class SpriteBuilder {
         container.addChild(chassis);
     }
     chassis.clear();
+
+    // Tracks
+    SketchUtils.drawComicBlock(chassis, 0, -22, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x444444);
+    SketchUtils.drawComicBlock(chassis, 0, 22, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x444444);
     
     // Wide body
     SketchUtils.drawComicBlock(chassis, 0, 0, TANK_W, TANK_H, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
     
     // Two barrels on back
     SketchUtils.drawComicCylinder(chassis, -15, -12, 8, 0x333333, 0x111111, 0x555555);
-    SketchUtils.drawComicCylinder(chassis, -15, 12, 8, 0x333333, 0x111111, 0x555555);                
-    
+    SketchUtils.drawComicCylinder(chassis, -15, 12, 8, 0x333333, 0x111111, 0x555555);
+    // Connect barrels with pipes
+    SketchUtils.drawSketchLine(chassis, -15, -12, -15, 12, 0.5, 0x222222, 4);
+
     let flamethrower = container.getChildByName("turret") as PIXI.Graphics;
     if (!flamethrower) {
         flamethrower = PoolManager.graphicsPool.acquire();
@@ -223,17 +244,29 @@ export class SpriteBuilder {
         container.addChild(flamethrower);
     }
     flamethrower.clear();
+
+    // Turret base
+    SketchUtils.drawComicCylinder(flamethrower, 0, 0, 14, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
     
     // Huge flamethrower nozzle
-    SketchUtils.drawComicBlock(flamethrower, 15, 0, 35, 12, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+    SketchUtils.drawComicBlock(flamethrower, 20, 0, 30, 10, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+    // Igniter / Pilot light at the end
+    SketchUtils.drawComicCylinder(flamethrower, 35, 0, 4, 0xffaa00, 0xcc6600, 0xffff00);
+
+    // Evil red eye
+    SketchUtils.drawSketchCircle(flamethrower, 6, 0, 4, 0xff0000);
   }
 
   static drawEnemySapper(container: PIXI.Container) {
     const TANK_W = 30; // Narrow body
     const TANK_H = 34;
+    const TRACK_W = 36;
+    const TRACK_H = 10;
     const BASE_COLOR = 0x4a4a4a;
     const SHADOW_COLOR = 0x2a2a2a;
     const HIGHLIGHT_COLOR = 0x6a6a6a;
+    const TRACK_COLOR = 0x222222;
+    const TRACK_SHADOW = 0x111111;
     
     let chassis = container.getChildByName("chassis") as PIXI.Graphics;
     if (!chassis) {
@@ -242,26 +275,48 @@ export class SpriteBuilder {
         container.addChild(chassis);
     }
     chassis.clear();
+
+    // Tracks
+    SketchUtils.drawComicBlock(chassis, 0, -18, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x444444);
+    SketchUtils.drawComicBlock(chassis, 0, 18, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x444444);
     
     // Narrow hull
     SketchUtils.drawComicBlock(chassis, 0, 0, TANK_W, TANK_H, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
     
-    let drill = container.getChildByName("turret") as PIXI.Graphics;
-    if (!drill) {
-        drill = PoolManager.graphicsPool.acquire();
-        drill.name = "turret";
-        container.addChild(drill);
+    let turret = container.getChildByName("turret") as PIXI.Graphics;
+    if (!turret) {
+        turret = PoolManager.graphicsPool.acquire();
+        turret.name = "turret";
+        container.addChild(turret);
     }
-    drill.clear();
+    turret.clear();
+
+    // Turret base
+    SketchUtils.drawComicCylinder(turret, 0, 0, 12, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+
+    // Drill Base
+    SketchUtils.drawComicBlock(turret, 14, 0, 10, 16, 0x666666, 0x444444, 0x888888);
     
     // Drill
-    drill.beginPath();
-    drill.moveTo(15, -10);
-    drill.lineTo(30, 0);
-    drill.lineTo(15, 10);
-    drill.closePath();
-    drill.fill({ color: 0xaaaaaa });
-    drill.stroke({ width: 2, color: 0x000000 });
+    turret.beginPath();
+    turret.moveTo(19, -8);
+    turret.lineTo(34, 0);
+    turret.lineTo(19, 8);
+    turret.closePath();
+    turret.fill({ color: 0xaaaaaa });
+    
+    // Drill spiral lines
+    turret.beginPath();
+    turret.moveTo(22, -6);
+    turret.lineTo(24, 4);
+    turret.moveTo(26, -4);
+    turret.lineTo(28, 2);
+    turret.stroke({ width: 1.5, color: 0x444444 });
+
+    turret.stroke({ width: 2.5, color: 0x000000, join: "round" });
+
+    // Evil red eye
+    SketchUtils.drawSketchCircle(turret, 5, 0, 3.5, 0xff0000);
   }
 
   static buildSprite(

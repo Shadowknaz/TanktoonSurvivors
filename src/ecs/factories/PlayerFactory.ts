@@ -8,14 +8,17 @@ import {
   PlayerControlled,
   MatterBody,
   Weapon,
+  Weapon,
   PlayerBuffs,
-  TankTracks
+  TankTracks,
+  PlayerStats
 } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { GameConfig } from "../../config/GameConfig";
 import { CollisionCategory } from "../../config/PhysicsConfig";
 import { useGameStore } from "../../stores/GameStore";
 import { SpriteId, GameState } from "../../models/types";
+import { StatsUtils } from "../../utils/StatsUtils";
 
 export class PlayerFactory {
   static createPlayer(
@@ -48,6 +51,9 @@ export class PlayerFactory {
     addComponent(worldInstance, eid, PlayerBuffs);
     PlayerBuffs.speedTimer[eid] = 0;
     PlayerBuffs.invulnTimer[eid] = 0;
+    PlayerBuffs.adrenalineTimer[eid] = 0;
+    PlayerBuffs.deflectionCount[eid] = 0;
+    PlayerBuffs.predatorCrit[eid] = 0;
 
     addComponent(worldInstance, eid, TankTracks);
     TankTracks.lastX[eid] = x;
@@ -58,6 +64,9 @@ export class PlayerFactory {
     Weapon.cooldown[eid] = GameConfig.PLAYER_RELOAD_TIME_MS / 1000.0;
     Weapon.isShooting[eid] = 0;
     Weapon.muzzleOffset[eid] = 43; // Player muzzle offset
+
+    addComponent(worldInstance, eid, PlayerStats);
+    StatsUtils.resetPlayerStats(eid);
 
     const body = physicsEngine.createRectangleBody(x, y, 32, 32, {
       mass: GameConfig.PLAYER_MASS || 500,

@@ -1,14 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../stores/GameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { GameConfig } from '../config/GameConfig';
 import { GameState } from '../models/types';
 import { en } from '../localization/en';
 import { MainMenu } from './MainMenu';
 import { DeviceUtils } from '../utils/DeviceUtils';
 
+const FPSCounter: React.FC = () => {
+    const fps = useGameStore(s => s.fps);
+    return <div className="absolute top-0 right-0 font-mono text-xs text-black/50 p-2">{en.fps}: {fps}</div>;
+};
+
 export const UIOverlay: React.FC = () => {
-    const store = useGameStore();
-    const { playerHealth, playerMaxHealth, playerExp, playerNextLevelExp, playerLevel, currentLevelUpOptions, acquiredUpgrades, endLevelUp, currentSpeed, activeBuff, gameState, fps } = store;
+    const { playerHealth, playerMaxHealth, playerExp, playerNextLevelExp, playerLevel, currentLevelUpOptions, acquiredUpgrades, endLevelUp, currentSpeed, activeBuff, gameState, goldRushTimeLeft } = useGameStore(useShallow((state) => ({
+        playerHealth: state.playerHealth,
+        playerMaxHealth: state.playerMaxHealth,
+        playerExp: state.playerExp,
+        playerNextLevelExp: state.playerNextLevelExp,
+        playerLevel: state.playerLevel,
+        currentLevelUpOptions: state.currentLevelUpOptions,
+        acquiredUpgrades: state.acquiredUpgrades,
+        endLevelUp: state.endLevelUp,
+        currentSpeed: state.currentSpeed,
+        activeBuff: state.activeBuff,
+        gameState: state.gameState,
+        goldRushTimeLeft: state.goldRushTimeLeft
+    })));
     const isMobile = DeviceUtils.isMobile();
 
     const [isInputLocked, setIsInputLocked] = useState(false);
@@ -27,7 +45,6 @@ export const UIOverlay: React.FC = () => {
 
     const isMenu = gameState === GameState.MENU;
     const isGameOver = gameState === GameState.GAME_OVER;
-    const goldRushTimeLeft = store.goldRushTimeLeft;
     
     const isGoldRush = goldRushTimeLeft > 0;
 
@@ -106,7 +123,7 @@ export const UIOverlay: React.FC = () => {
                         </div>
                     ))}
                 </div>
-                <div className="absolute top-0 right-0 font-mono text-xs text-black/50 p-2">{en.fps}: {fps}</div>
+                <FPSCounter />
             </div>
 
             {/* Bottom section for Active Buff */}
@@ -142,10 +159,11 @@ export const UIOverlay: React.FC = () => {
                                    key={option.id}
                                    disabled={isInputLocked}
                                    onClick={() => !isInputLocked && endLevelUp(option.id)}
-                                   className={`${option.colorClass} border-8 border-black p-6 rounded-none text-left shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all ${isInputLocked ? 'opacity-70 grayscale-[0.5]' : 'hover:translate-y-2 hover:translate-x-2 hover:shadow-none active:scale-95'}`}
+                                   className={`${option.colorClass} border-8 ${option.isSynergy ? 'border-yellow-400 outline outline-4 outline-black' : 'border-black'} p-6 rounded-none text-left shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all ${isInputLocked ? 'opacity-70 grayscale-[0.5]' : 'hover:translate-y-2 hover:translate-x-2 hover:shadow-none active:scale-95'} relative overflow-hidden`}
                                >
-                                   <div className="font-black text-2xl mb-3 uppercase tracking-tight">{option.name}</div>
-                                   <div className="text-base font-bold opacity-90 whitespace-pre-line leading-tight">{option.description}</div>
+                                   {option.isSynergy && <div className="absolute inset-0 bg-yellow-400/20 mix-blend-overlay animate-pulse pointer-events-none" />}
+                                   <div className={`font-black text-2xl mb-3 uppercase tracking-tight relative z-10 ${option.isSynergy ? 'text-yellow-100 drop-shadow-[2px_2px_0_rgba(0,0,0,1)]' : ''}`}>{option.name}</div>
+                                   <div className="text-base font-bold opacity-90 whitespace-pre-line leading-tight relative z-10">{option.description}</div>
                                </button>
                            ))}
                        </div>

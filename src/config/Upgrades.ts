@@ -4,10 +4,18 @@ import { en } from "../localization/en";
 export type UpgradeId = string;
 
 export interface UpgradeEffect {
-    type: 'statAdd' | 'setTrue' | 'heal' | 'maxHealthAdd';
+    type: 'statAdd' | 'setTrue' | 'heal' | 'maxHealthAdd' | 'removeUpgrade' | 'removeItem';
     stat?: string;
     value?: number;
     maxValue?: number;
+    upgradeId?: UpgradeId;
+    itemId?: string;
+}
+
+export interface SynergyRequirement {
+    id: UpgradeId; // Can also be itemId
+    minLevel: number;
+    type?: 'upgrade' | 'item';
 }
 
 export interface UpgradeOption {
@@ -15,8 +23,11 @@ export interface UpgradeOption {
   name: string;
   description: string;
   colorClass: string;
+  type?: 'weapon' | 'passive' | 'item' | 'synergy';
   maxLevels?: number;
   effects: UpgradeEffect[];
+  requirements?: SynergyRequirement[];
+  isSynergy?: boolean;
 }
 
 export const UPGRADE_OPTIONS: UpgradeOption[] = [
@@ -136,6 +147,145 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
       maxLevels: 5,
       effects: [
           { type: 'statAdd', stat: 'critChance', value: 0.15, maxValue: 0.75 }
+      ]
+  },
+  {
+      id: 'napalmMinigun',
+      name: en.upgrades.napalmMinigun.name,
+      description: en.upgrades.napalmMinigun.description,
+      colorClass: 'bg-yellow-600 hover:bg-yellow-500',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'autogun', minLevel: 1 },
+          { id: 'explosive', minLevel: 1 }
+      ],
+      effects: [
+          { type: 'removeUpgrade', upgradeId: 'autogun' },
+          { type: 'setTrue', stat: 'hasNapalmMinigun' }
+      ]
+  },
+  {
+      id: 'vampiricArmor',
+      name: en.upgrades.vampiricArmor.name,
+      description: en.upgrades.vampiricArmor.description,
+      colorClass: 'bg-rose-700 hover:bg-rose-600',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'vampirism', minLevel: 3 },
+          { id: 'armor', minLevel: 4 }
+      ],
+      effects: [
+          { type: 'removeUpgrade', upgradeId: 'vampirism' },
+          { type: 'removeUpgrade', upgradeId: 'armor' },
+          { type: 'setTrue', stat: 'hasVampiricArmor' }
+      ]
+  },
+  {
+      id: 'ricochet',
+      name: en.upgrades.ricochet.name,
+      description: en.upgrades.ricochet.description,
+      colorClass: 'bg-emerald-600 hover:bg-emerald-500',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'piercing', minLevel: 2 },
+          { id: 'multishot', minLevel: 1 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasRicochet' }
+      ]
+  },
+  {
+      id: 'adrenaline',
+      name: en.upgrades.adrenaline.name,
+      description: en.upgrades.adrenaline.description,
+      colorClass: 'bg-red-600 hover:bg-red-500',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'vampirism', minLevel: 1 },
+          { id: 'speed', minLevel: 2 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasAdrenaline' }
+      ]
+  },
+  {
+      id: 'shrapnel',
+      name: en.upgrades.shrapnel.name,
+      description: en.upgrades.shrapnel.description,
+      colorClass: 'bg-orange-600 hover:bg-orange-500',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'explosive', minLevel: 1 },
+          { id: 'critical', minLevel: 2 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasShrapnel' }
+      ]
+  },
+  {
+      id: 'overload',
+      name: en.upgrades.overload.name,
+      description: en.upgrades.overload.description,
+      colorClass: 'bg-indigo-600 hover:bg-indigo-500',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'fireRate', minLevel: 5 },
+          { id: 'damage', minLevel: 3 }
+      ],
+      effects: [
+          { type: 'statAdd', stat: 'fireRateMultiplier', value: 0.3 },
+          { type: 'statAdd', stat: 'damage', value: -2 } // -10% of base damage 20
+      ]
+  },
+  {
+      id: 'reactiveArmor',
+      name: en.upgrades.reactiveArmor.name,
+      description: en.upgrades.reactiveArmor.description,
+      colorClass: 'bg-teal-700 hover:bg-teal-600',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'armor', minLevel: 2 },
+          { id: 'health', minLevel: 2 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasReactiveArmor' }
+      ]
+  },
+  {
+      id: 'predator',
+      name: en.upgrades.predator.name,
+      description: en.upgrades.predator.description,
+      colorClass: 'bg-fuchsia-700 hover:bg-fuchsia-600',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'agility', minLevel: 3 },
+          { id: 'critical', minLevel: 2 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasPredator' }
+      ]
+  },
+  {
+      id: 'autoVolley',
+      name: en.upgrades.autoVolley.name,
+      description: en.upgrades.autoVolley.description,
+      colorClass: 'bg-blue-600 hover:bg-blue-500',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'autogun', minLevel: 1 },
+          { id: 'multishot', minLevel: 2 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasAutoVolley' }
       ]
   }
 ];

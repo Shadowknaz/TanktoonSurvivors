@@ -21,7 +21,8 @@ import {
   AutoWeapon,
   Pierce,
   ArcedProjectile,
-  GameState
+  GameState,
+  PlayerStats
 } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
@@ -130,7 +131,21 @@ export class WeaponSystem {
 
       const isPlayer = hasComponent(world, eid, PlayerControlled);
       const enemyStats = { damage: Weapon.damage[eid] || GameConfig.PROJECTILE_DAMAGE_ENEMY };
-      const stats = (isPlayer ? context.playerStats : enemyStats) as any;
+      
+      let stats: any;
+      if (isPlayer) {
+          stats = {
+              damage: PlayerStats.damage[eid],
+              explosiveRadius: PlayerStats.explosiveRadius[eid],
+              pierceCount: PlayerStats.pierceCount[eid],
+              hasAutoGun: PlayerStats.hasAutoGun[eid],
+              multishotCount: PlayerStats.multishotCount[eid],
+              fireRateMultiplier: PlayerStats.fireRateMultiplier[eid],
+              hasAutoVolley: PlayerStats.hasAutoVolley[eid]
+          };
+      } else {
+          stats = enemyStats;
+      }
 
       // Ensure Player has AutoWeapon if they grabbed the upgrade
       if (isPlayer && stats?.hasAutoGun && !hasComponent(world, eid, AutoWeapon)) {
@@ -144,7 +159,15 @@ export class WeaponSystem {
 
       // Handle Automatic Weapon
       if (hasComponent(world, eid, AutoWeapon)) {
-          if (gameTime - AutoWeapon.lastFired[eid] >= AutoWeapon.cooldown[eid]) {
+          let currentCooldown = AutoWeapon.cooldown[eid];
+          let shotsToFire = 1;
+
+          if (isPlayer && stats?.hasAutoVolley) {
+              currentCooldown *= GameConfig.SYNERGY_AUTO_VOLLEY_COOLDOWN_MULT;
+              shotsToFire = GameConfig.SYNERGY_AUTO_VOLLEY_SHOTS;
+          }
+
+          if (gameTime - AutoWeapon.lastFired[eid] >= currentCooldown) {
               // Find nearest enemy
               const px = Position.x[eid];
               const py = Position.y[eid];
@@ -166,7 +189,11 @@ export class WeaponSystem {
               if (nearestAngle !== null) {
                   AutoWeapon.lastFired[eid] = gameTime;
                   const autoStats = { ...stats, damage: AutoWeapon.damage[eid], explosiveRadius: 0 };
-                  this.createProjectile(world, physicsEngine, eid, px, py, nearestAngle, true, autoStats, AutoWeapon.muzzleOffset[eid]);
+                  
+                  for (let s = 0; s < shotsToFire; s++) {
+                      const curAngle = nearestAngle + (s - (shotsToFire - 1) / 2) * GameConfig.CLUSTER_SPREAD_ANGLE;
+                      this.createProjectile(world, physicsEngine, eid, px, py, curAngle, true, autoStats, AutoWeapon.muzzleOffset[eid]);
+                  }
               }
           }
       }

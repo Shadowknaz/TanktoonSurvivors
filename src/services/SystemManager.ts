@@ -12,6 +12,7 @@ import { SpawnSystem } from "../ecs/systems/SpawnSystem";
 import { WeaponSystem } from "../ecs/systems/WeaponSystem";
 import { CollisionSystem } from "../ecs/systems/CollisionSystem";
 import { EventSystem } from "../ecs/systems/EventSystem";
+import { UpgradeSystem } from "../ecs/systems/UpgradeSystem";
 
 export class SystemManager {
   private inputSystem = new InputSystem();
@@ -22,11 +23,13 @@ export class SystemManager {
   private weaponSystem = new WeaponSystem();
   private collisionSystem = new CollisionSystem();
   private eventSystem = new EventSystem();
+  private upgradeSystem = new UpgradeSystem();
 
   update(world: World, physicsEngine: PhysicsEngine, inputViewModel: InputViewModel, pixiRenderer: PixiRenderer, deltaTime: number, context: GameContext, alpha: number) {
     const isPaused = context.isLevelingUp || context.isGameOver || context.isMenu;
 
     if (!isPaused) {
+      this.upgradeSystem.update(world);
       this.eventSystem.update(world, physicsEngine, deltaTime, context);
       this.spawnSystem.update(world, physicsEngine, deltaTime, context);
       this.inputSystem.update(world, inputViewModel.getState(), deltaTime, context);

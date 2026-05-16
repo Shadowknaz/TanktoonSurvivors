@@ -35,6 +35,15 @@ export const en = {
         piercing: { name: "Armor Piercing", description: "Projectiles pierce 1 enemy" },
         agility: { name: "Agility Training", description: "10% Evasion chance" },
         critical: { name: "Weakpoint Targeting", description: "+15% Crit chance" },
+        napalmMinigun: { name: "Napalm Minigun", description: "SYNERGY: Machine Gun + Explosive Ammo. Exploding auto-fire!" },
+        vampiricArmor: { name: "Vampiric Armor", description: "SYNERGY: Vampiric Coating + Sloped Armor. Deflections heal you!" },
+        ricochet: { name: "Ricochet", description: "SYNERGY. Bounces to nearest enemy after pierce." },
+        adrenaline: { name: "Adrenaline", description: "SYNERGY. Kill gives +40% speed for 1.5s." },
+        shrapnel: { name: "Shrapnel", description: "SYNERGY. Crits create mini-explosions." },
+        overload: { name: "Overload", description: "SYNERGY. +30% Fire Rate, -10% Damage." },
+        reactiveArmor: { name: "Reactive Armor", description: "SYNERGY. Every 4th deflection heals 15 HP." },
+        predator: { name: "Predator", description: "SYNERGY. Next shot after evasion is 100% crit." },
+        autoVolley: { name: "Auto-Volley", description: "SYNERGY. Autogun fires 2 shots but has +15% cooldown." }
     }
 };
 

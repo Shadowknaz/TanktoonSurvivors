@@ -59,7 +59,6 @@ export class GameApp {
          isMenu: state.gameState === GameStateEnum.MENU,
          cameraShake: state.cameraShake,
          screenShakeEnabled: state.settings.screenShake,
-         playerStats: state.playerStats,
          playerHealth: state.playerHealth,
          playerMaxHealth: state.playerMaxHealth,
          currentSpeed: state.currentSpeed,

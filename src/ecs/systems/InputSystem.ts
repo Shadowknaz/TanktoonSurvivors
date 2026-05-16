@@ -1,5 +1,5 @@
 import {  query, hasComponent, addComponent , World } from "bitecs";
-import { PlayerControlled, Position, Velocity, Weapon, Health, PlayerBuffs } from "../components";
+import { PlayerControlled, Position, Velocity, Weapon, Health, PlayerBuffs, PlayerStats } from "../components";
 import { InputState } from "../../viewmodels/InputViewModel";
 import { GameConfig } from "../../config/GameConfig";
 import { RenderConfig } from "../../config/RenderConfig";
@@ -20,27 +20,53 @@ export class InputSystem {
 
       // Tick down buffs and sync to store
       const currentActiveBuff = context.activeBuff;
-      let newBuff = null;
+      let buffName = "";
+      let buffTimer = 0;
+      let buffMax = 0;
+      let buffColor = "";
 
       if (PlayerBuffs.speedTimer[eid] > 0) {
         PlayerBuffs.speedTimer[eid]--;
-        newBuff = { name: "SPEED+", timer: PlayerBuffs.speedTimer[eid], maxTimer: EventConfig.LOOT_SPEED_DURATION, color: "text-yellow-400 bg-yellow-500" };
+        buffName = "SPEED+";
+        buffTimer = PlayerBuffs.speedTimer[eid];
+        buffMax = EventConfig.LOOT_SPEED_DURATION;
+        buffColor = "text-yellow-400 bg-yellow-500";
         if (RandomUtils.random() < 0.2) {
-          EffectFactory.spawnComicEffect(world, px, py, 2); // BAM effect occasionally for speed
+          EffectFactory.spawnComicEffect(world, px, py, 2);
         }
       } else if (PlayerBuffs.invulnTimer[eid] > 0) {
         PlayerBuffs.invulnTimer[eid]--;
-        // Only show UI buff for long loot drops, not damage i-frames (which are usually < 60 frames)
-        if (PlayerBuffs.invulnTimer[eid] > 60 || context.activeBuff?.name === "INVULNERABLE") {
-            newBuff = { name: "INVULNERABLE", timer: PlayerBuffs.invulnTimer[eid], maxTimer: EventConfig.LOOT_INVULN_DURATION, color: "text-blue-400 bg-blue-500" };
+        if (PlayerBuffs.invulnTimer[eid] > 60 || currentActiveBuff?.name === "INVULNERABLE") {
+            buffName = "INVULNERABLE";
+            buffTimer = PlayerBuffs.invulnTimer[eid];
+            buffMax = EventConfig.LOOT_INVULN_DURATION;
+            buffColor = "text-blue-400 bg-blue-500";
             if (RandomUtils.random() < 0.1) {
-              EffectFactory.spawnParticleBubble(world, px + (RandomUtils.random() - 0.5) * 40, py + (RandomUtils.random() - 0.5) * 40); // Bubbles for invuln
+              EffectFactory.spawnParticleBubble(world, px + (RandomUtils.random() - 0.5) * 40, py + (RandomUtils.random() - 0.5) * 40);
             }
+        }
+      } else if (PlayerBuffs.adrenalineTimer[eid] > 0) {
+        PlayerBuffs.adrenalineTimer[eid] -= dt;
+        if (PlayerBuffs.adrenalineTimer[eid] < 0) PlayerBuffs.adrenalineTimer[eid] = 0;
+        
+        if (PlayerBuffs.adrenalineTimer[eid] > 0) {
+            buffName = "ADRENALINE";
+            buffTimer = Math.ceil(PlayerBuffs.adrenalineTimer[eid] * 60);
+            buffMax = GameConfig.SYNERGY_ADRENALINE_MAX_TIMER_FRAMES;
+            buffColor = "text-red-500 bg-red-600";
         }
       }
 
-      if ((currentActiveBuff && !newBuff) || (!currentActiveBuff && newBuff) || (newBuff && currentActiveBuff && newBuff.name !== currentActiveBuff.name) || (newBuff && newBuff.timer % 15 === 0)) {
-           context.setActiveBuff(newBuff);
+      const isBuffActive = buffName !== "";
+      const shouldClearBuff = currentActiveBuff && !isBuffActive;
+      const isNewBuff = !currentActiveBuff && isBuffActive;
+      const isDifferentBuff = isBuffActive && currentActiveBuff && buffName !== currentActiveBuff.name;
+      const isTimerUpdate = isBuffActive && buffTimer % 15 === 0;
+
+      if (shouldClearBuff) {
+           context.setActiveBuff(null);
+      } else if (isNewBuff || isDifferentBuff || isTimerUpdate) {
+           context.setActiveBuff({ name: buffName, timer: buffTimer, maxTimer: buffMax, color: buffColor });
       }
 
       const rw = GameConfig.VIRTUAL_WIDTH;
@@ -52,24 +78,20 @@ export class InputSystem {
       let moveY = (inputState.moveUp ? -1 : 0) + (inputState.moveDown ? 1 : 0);
       let moveX = (inputState.moveLeft ? -1 : 0) + (inputState.moveRight ? 1 : 0);
 
-      let baseSpeed = context.playerStats.speed;
+      let baseSpeed = PlayerStats.speed[eid];
       
       // Apply speed buff
       if (PlayerBuffs.speedTimer[eid] > 0) {
         baseSpeed += EventConfig.LOOT_SPEED_BONUS;
       }
       
-      // Update max health from store, and update store with current health if we healed
+      if (PlayerBuffs.adrenalineTimer[eid] > 0) {
+        baseSpeed *= GameConfig.SYNERGY_ADRENALINE_SPEED_MULT;
+      }
+      
+      // Send health state back to store for UI
       if (hasComponent(world, eid, Health)) {
-        if (Health.max[eid] !== context.playerMaxHealth) {
-            Health.max[eid] = context.playerMaxHealth;
-        }
-        if (Health.current[eid] < context.playerHealth) {
-            // If the store healed the player (e.g. level up)
-            Health.current[eid] = context.playerHealth;
-        }
-        // Send state back to store for UI (e.g. when taking damage)
-        if (Health.current[eid] > 0 && Health.current[eid] < context.playerHealth) {
+        if (Health.current[eid] !== context.playerHealth || Health.max[eid] !== context.playerMaxHealth) {
             context.setPlayerHealth(Health.current[eid], Health.max[eid]);
         }
       }
