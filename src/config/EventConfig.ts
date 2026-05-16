@@ -1,0 +1,37 @@
+export const EventConfig = {
+  // Interval between random map events
+  EVENT_INTERVAL_MIN: 600, // 10 seconds
+  EVENT_INTERVAL_MAX: 1500, // 25 seconds
+
+  // Bomber
+  BOMBER_WARNING_FRAMES: 240, // 4 seconds delay
+  BOMBER_RADIUS: 200,
+  BOMBER_DAMAGE: 50,
+
+  // Artillery
+  ARTILLERY_COUNT: 5,
+  ARTILLERY_INTERVAL: 20,
+  ARTILLERY_WARNING_FRAMES: 120,
+  ARTILLERY_RADIUS: 80,
+  ARTILLERY_DAMAGE: 20,
+
+  // Loot Drop
+  LOOT_TYPES: {
+    SPEED: 0,
+    INVULNERABLE: 1
+  },
+  LOOT_RADIUS: 20,
+  LOOT_SPEED_BONUS: 20,
+  LOOT_SPEED_DURATION: 600, // 10 seconds
+  LOOT_INVULN_DURATION: 300, // 5 seconds
+
+  // Cluster Mines
+  CLUSTER_MINES_COUNT: 15,
+  CLUSTER_MINES_LIFETIME: 7.0, // 7 seconds
+  CLUSTER_MINES_DAMAGE: 30,
+  CLUSTER_MINES_GRID_SIZE: 7,
+
+  // Swarm
+  SWARM_COUNT: 20,
+  SWARM_RADIUS: 500,
+};
