@@ -22,7 +22,8 @@ import {
   Detonating,
   FlamerTank,
   GameState,
-  PlayerStats
+  PlayerStats,
+  Chain
 } from "../components";
 import { 
   removeEntity,
@@ -178,6 +179,24 @@ export class CollisionSystem {
                             if (PlayerStats.hasShrapnel[playerEid] && !isShrapnel) {
                                 CollisionSystem.shrapnelProcessedSet.clear();
                                 CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, CollisionSystem.shrapnelProcessedSet, true);
+                            }
+                        }
+
+                        if (PlayerStats.hasSeismic[playerEid] && isEidEnemy) {
+                            const kf = PlayerStats.knockbackForce[playerEid] || 0.15;
+                            const bodyId = MatterBody.bodyId[eid];
+                            const targetBody = physicsEngine.getBodyById(bodyId);
+                            if (targetBody) {
+                                const angle = Math.atan2(Position.y[eid] - cy, Position.x[eid] - cx);
+                                const force = kf * targetBody.mass;
+                                Matter.Body.applyForce(targetBody, targetBody.position, {
+                                    x: Math.cos(angle) * force,
+                                    y: Math.sin(angle) * force
+                                });
+
+                                if (PlayerStats.hasStasis[playerEid]) {
+                                    AIBehavior.slowTimer[eid] = 0.5;
+                                }
                             }
                         }
                     }
@@ -468,6 +487,26 @@ export class CollisionSystem {
                         CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[targetEid], Position.y[targetEid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, CollisionSystem.shrapnelProcessedSet, true);
                     }
                 }
+
+                if (PlayerStats.knockbackForce[playerEid] > 0 && isTargetEnemy) {
+                    const kf = PlayerStats.knockbackForce[playerEid];
+                    const bodyId = MatterBody.bodyId[targetEid];
+                    const targetBody = physicsEngine.getBodyById(bodyId);
+                    if (targetBody) {
+                        const angle = Math.atan2(Position.y[targetEid] - Position.y[sourceEid], Position.x[targetEid] - Position.x[sourceEid]);
+                        const force = kf * targetBody.mass;
+                        Matter.Body.applyForce(targetBody, targetBody.position, {
+                            x: Math.cos(angle) * force,
+                            y: Math.sin(angle) * force
+                        });
+                        
+                        EffectFactory.spawnParticleBubble(world, Position.x[targetEid], Position.y[targetEid]);
+                        
+                        if (PlayerStats.hasStasis[playerEid]) {
+                            AIBehavior.slowTimer[targetEid] = 0.5;
+                        }
+                    }
+                }
             }
 
             Health.current[targetEid] -= finalDamage;
@@ -552,6 +591,51 @@ export class CollisionSystem {
                             Position.angle[sourceEid] = angle;
                         }
                     }
+                }
+            } else if (isSourceProjectile && hasComponent(world, sourceEid, Chain) && Chain.count[sourceEid] > 0 && !isTargetWall) {
+                Chain.count[sourceEid] -= 1;
+                
+                const enemies = query(world, [Position, AIBehavior]);
+                let nearestEnemy = -1;
+                let minDist = Infinity;
+                const px = Position.x[targetEid];
+                const py = Position.y[targetEid];
+
+                for (let i = 0; i < enemies.length; i++) {
+                    const tEnemy = enemies[i];
+                    if (tEnemy === targetEid) continue;
+                    const dx = Position.x[tEnemy] - px;
+                    const dy = Position.y[tEnemy] - py;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < minDist) {
+                        minDist = distSq;
+                        nearestEnemy = tEnemy;
+                    }
+                }
+                
+                if (nearestEnemy !== -1) {
+                    const bodyId = MatterBody.bodyId[sourceEid];
+                    const body = physicsEngine.getBodyById(bodyId);
+                    if (body) {
+                        const angle = Math.atan2(Position.y[nearestEnemy] - py, Position.x[nearestEnemy] - px);
+                        const speed = body.speed || GameConfig.PROJECTILE_SPEED_PLAYER;
+                        Matter.Body.setVelocity(body, { 
+                            x: Math.cos(angle) * speed, 
+                            y: Math.sin(angle) * speed 
+                        });
+                        Position.angle[sourceEid] = angle;
+                        Matter.Body.setPosition(body, { 
+                            x: px + Math.cos(angle) * 30, 
+                            y: py + Math.sin(angle) * 30 
+                        });
+                        
+                        EffectFactory.spawnParticleBubble(world, px, py);
+                    }
+                } else {
+                    if (hasComponent(world, sourceEid, Health)) {
+                        Health.current[sourceEid] = 0;
+                    }
+                    this.destroyEntity(world, physicsEngine, sourceEid);
                 }
             } else {
                 if (hasComponent(world, sourceEid, Health)) {

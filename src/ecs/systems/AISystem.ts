@@ -297,7 +297,12 @@ export class AISystem {
       const targetForceY = moveY + sepY * GameConfig.AI_STEERING_WEIGHTS.separation + avoidY * GameConfig.AI_STEERING_WEIGHTS.avoidObstacles;
 
       const mag = Math.hypot(targetForceX, targetForceY);
-      const speedMult = AIBehavior.speedMult[eid] || 1.0;
+      let speedMult = AIBehavior.speedMult[eid] || 1.0;
+
+      if (AIBehavior.slowTimer[eid] > 0) {
+          AIBehavior.slowTimer[eid] -= dt;
+          speedMult *= 0.5; // Stasis slows by 50%
+      }
 
       Velocity.x[eid] = mag > 0 ? (targetForceX / mag) * GameConfig.ENEMY_BASE_SPEED * speedMult : 0;
       Velocity.y[eid] = mag > 0 ? (targetForceY / mag) * GameConfig.ENEMY_BASE_SPEED * speedMult : 0;

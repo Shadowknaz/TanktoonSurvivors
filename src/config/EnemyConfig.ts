@@ -106,8 +106,8 @@ export const ENEMY_TEMPLATES: Record<EnemyType, EnemyTemplate> = {
         type: EnemyType.GRENADIER,
         health: 120,
         spriteId: SpriteId.ENEMY_GRENADIER,
-        width: 48,
-        height: 48,
+        width: 56,  // matches sprite TRACK_W=60, hull 54
+        height: 42, // matches sprite with tracks (-20 to +20) + hull
         speedModifier: 0.6,
         weapon: {
             cooldown: 4.0,
@@ -120,8 +120,8 @@ export const ENEMY_TEMPLATES: Record<EnemyType, EnemyTemplate> = {
         type: EnemyType.SAPPER,
         health: 80,
         spriteId: SpriteId.ENEMY_SAPPER,
-        width: 32,
-        height: 32,
+        width: 34,  // matches sprite TANK_W=30 + margin
+        height: 36, // matches sprite TANK_H=34 + margin
         speedModifier: 1.1,
         isSapper: true
     },
@@ -129,8 +129,8 @@ export const ENEMY_TEMPLATES: Record<EnemyType, EnemyTemplate> = {
         type: EnemyType.FLAMER,
         health: 150,
         spriteId: SpriteId.ENEMY_FLAMER,
-        width: 48,
-        height: 48,
+        width: 52,  // matches sprite TRACK_W=54, hull 46
+        height: 46, // matches sprite with tracks (-22 to +22)
         speedModifier: 0.8,
         isFlamer: true
     }

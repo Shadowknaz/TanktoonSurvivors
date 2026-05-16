@@ -71,6 +71,11 @@ export class PoolManager {
             }) as Matter.Body & IPoolable;
             
             body.reset = function() {
+                if ((this as any).currentScale && (this as any).currentScale !== 1.0) {
+                    const inv = 1.0 / (this as any).currentScale;
+                    Matter.Body.scale(this, inv, inv);
+                }
+                (this as any).currentScale = 1.0;
                 Matter.Body.setAngle(this, 0);
                 Matter.Body.setVelocity(this, { x: 0, y: 0 });
                 Matter.Body.setAngularVelocity(this, 0);

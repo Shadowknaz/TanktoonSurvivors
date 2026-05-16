@@ -22,6 +22,7 @@ export const AIBehavior = defineComponent({
   targetEntity: Types.ui32,
   lastPathRecalc: Types.f32,
   speedMult: Types.f32,
+  slowTimer: Types.f32,
 });
 
 export const Rammer = defineComponent({
@@ -55,9 +56,14 @@ export const Weapon = defineComponent({
 
 export const Projectile = defineComponent({
   ownerType: Types.ui8, // 1 = player, 2 = enemy
+  scale: Types.f32,
 });
 
 export const Pierce = defineComponent({
+  count: Types.ui8,
+});
+
+export const Chain = defineComponent({
   count: Types.ui8,
 });
 
@@ -232,4 +238,9 @@ export const PlayerStats = defineComponent({
   hasReactiveArmor: Types.ui8,
   hasPredator: Types.ui8,
   hasAutoVolley: Types.ui8,
+  projectileSizeMult: Types.f32,
+  knockbackForce: Types.f32,
+  chainCount: Types.ui8,
+  hasSeismic: Types.ui8,
+  hasStasis: Types.ui8,
 });

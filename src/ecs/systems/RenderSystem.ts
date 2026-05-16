@@ -14,7 +14,10 @@ import {
   Airdrop,
   AIBehavior,
   PlayerBuffs,
-  GameState
+  GameState,
+  FlamerTank,
+  Burrowed,
+  Projectile
 } from "../components";
 import { PixiRenderer } from "../../views/renderers/PixiRenderer";
 import * as PIXI from "pixi.js";
@@ -179,6 +182,7 @@ export class RenderSystem {
               break;
             case SpriteId.TRACK_MARK:
               container.zIndex = -15; // Above ravine and dirt patch, below objects
+              container.blendMode = 'multiply';
               break;
             case SpriteId.LANDMINE:
             case SpriteId.LOOT_CRATE:
@@ -189,6 +193,7 @@ export class RenderSystem {
               break;
             case SpriteId.SMOKE_CLOUD:
               container.zIndex = 5;
+              container.blendMode = 'multiply';
               break;
             default:
               container.zIndex = 0;
@@ -203,8 +208,7 @@ export class RenderSystem {
           // Redraw "boiling" sprites periodically
           const staticSprites = [
             SpriteId.WALL, SpriteId.TREE, SpriteId.HOUSE, SpriteId.BROKEN_HOUSE,
-            SpriteId.RAVINE, SpriteId.DIRT_PATCH, SpriteId.COMIC_EFFECT, SpriteId.LOOT_CRATE, SpriteId.TRACK_MARK,
-            SpriteId.SMOKE_CLOUD
+            SpriteId.RAVINE, SpriteId.DIRT_PATCH, SpriteId.COMIC_EFFECT, SpriteId.LOOT_CRATE
           ];
           const isBoiling = !staticSprites.includes(spriteId);
           // Handle warning marker scale uniquely
@@ -304,7 +308,13 @@ export class RenderSystem {
         }
   
         let visualScale = 1;
-          let sprite = container.getChildByName("sprite") as PIXI.Graphics;
+        if (hasComponent(world, eid, Projectile)) {
+            const pScale = Projectile.scale[eid];
+            if (pScale > 0) {
+                visualScale = pScale;
+            }
+        }
+        let sprite = container.getChildByName("sprite") as PIXI.Graphics;
           if (hasComponent(world, eid, Airdrop)) {
               const z = Airdrop.z[eid];
               if (sprite) {
@@ -333,6 +343,13 @@ export class RenderSystem {
           }
   
           container.scale.set(visualScale);
+
+          // Burrowed emerge animation (Sapper)
+          if (hasComponent(world, eid, Burrowed)) {
+            const z = Burrowed.z[eid];
+            const progress = Math.max(0, Math.min(1, 1 - z / 600));
+            container.scale.set(progress * visualScale);
+          }
   
           if (hasComponent(world, eid, Weapon)) {
             const turret = container.getChildByName("turret");
@@ -360,6 +377,11 @@ export class RenderSystem {
                   turret.position.y = 0;
               }
             }
+          }
+
+          // Flamer flame effect — update every frame based on isSpraying
+          if (spriteId === SpriteId.ENEMY_FLAMER && hasComponent(world, eid, FlamerTank)) {
+            this.updateFlamerFlame(eid, container);
           }
           
           if (hasComponent(world, eid, Wreck) && hasComponent(world, eid, Lifetime)) {
@@ -532,6 +554,40 @@ export class RenderSystem {
     }
   }
   
+  private updateFlamerFlame(eid: number, container: PIXI.Container) {
+    let flame = container.getChildByName("flameEffect") as PIXI.Graphics;
+    if (!flame) {
+      flame = PoolManager.graphicsPool.acquire();
+      flame.name = "flameEffect";
+      container.addChild(flame);
+    }
+    flame.clear();
+
+    if (FlamerTank.isSpraying[eid] !== 1) return;
+
+    const turret = container.getChildByName("turret");
+    const tAngle = turret ? turret.rotation : 0;
+
+    // Nozzle tip is at x=35 in turret local space
+    const nozzleX = Math.cos(tAngle) * 35;
+    const nozzleY = Math.sin(tAngle) * 35;
+    const perpX = -Math.sin(tAngle);
+    const perpY =  Math.cos(tAngle);
+
+    // 4 flame puffs extending from the nozzle — inlined to avoid GC allocations
+    for (let i = 0; i < 4; i++) {
+      const dist   = 12 + i * 14;
+      const spread = (((eid * 7 + i * 13 + this.frameCount * 3) % 20) - 10);
+      const fx = nozzleX + Math.cos(tAngle) * dist + perpX * spread;
+      const fy = nozzleY + Math.sin(tAngle) * dist + perpY * spread;
+      const r  = 10 - i * 1.5;
+      const color = i < 2 ? 0xffff00 : (i === 2 ? 0xff8800 : 0xff4400);
+      flame.circle(fx, fy, r);
+      flame.fill({ color, alpha: 0.9 });
+    }
+    flame.stroke({ width: 2, color: 0x000000, alpha: 0.4 });
+  }
+
     private cleanupSpriteMap(renderer: PixiRenderer, activeEids: Set<number>) {
       for (const [eid, container] of this.spriteMap.entries()) {
         if (!activeEids.has(eid)) {

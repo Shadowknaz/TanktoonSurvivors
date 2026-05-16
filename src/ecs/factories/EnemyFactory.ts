@@ -82,7 +82,7 @@ export class EnemyFactory {
 
     if (template.isSapper) {
       addComponent(world, eid, Burrowed);
-      Burrowed.z[eid] = 0;
+      Burrowed.z[eid] = 600; // Starts underground, emerges toward 0
       Burrowed.emergeTimer[eid] = 0;
     }
     
@@ -105,7 +105,7 @@ export class EnemyFactory {
 
     addComponent(world, eid, Renderable);
     Renderable.spriteId[eid] = template.spriteId;
-    Renderable.visible[eid] = 1;
+    Renderable.visible[eid] = template.isSapper ? 0 : 1; // Sapper starts hidden
 
     return eid;
   }

@@ -392,8 +392,35 @@ export class SpriteBuilder {
            }
         }
         SpriteBuilder.drawLandmine(sprite, isBlinking);
+      } else if (spriteId === SpriteId.WRECK) {
+        SpriteBuilder.drawWreck(sprite);
       }
     }
+  }
+
+  static drawWreck(sprite: PIXI.Graphics) {
+    // Burned-out tracks
+    SketchUtils.drawSketchRect(sprite,  0, -20, 52, 10, 0x111111);
+    SketchUtils.drawSketchRect(sprite,  0,  20, 52, 10, 0x111111);
+
+    // Charred hull
+    SketchUtils.drawComicBlock(sprite, 0, 0, 44, 34, 0x222222, 0x111111, 0x3a3a3a);
+
+    // Burn craters
+    sprite.circle(-8, -5, 9);
+    sprite.circle(10,  6, 12);
+    sprite.fill({ color: 0x111111 });
+
+    // Diagonal scorch hatching
+    sprite.beginPath();
+    for (let i = -22; i < 22; i += 6) {
+      sprite.moveTo(i,     -15);
+      sprite.lineTo(i + 10, 15);
+    }
+    sprite.stroke({ width: 1.5, color: 0x000000, alpha: 0.45 });
+
+    // Ruined turret stub
+    SketchUtils.drawComicCylinder(sprite, -2, 0, 8, 0x1a1a1a, 0x111111, 0x2a2a2a);
   }
 
   static drawSmokeCloud(sprite: PIXI.Graphics, eid: number) {
@@ -449,10 +476,10 @@ export class SpriteBuilder {
   }
 
   static drawTrackMark(sprite: PIXI.Graphics) {
+    sprite.clear();
     // Two parallel tracks, matching roughly the tank track width
-    sprite.rect(-24, -8, 8, 16);
-    sprite.rect(16, -8, 8, 16);
-    sprite.fill({ color: 0x000000 });
+    SketchUtils.drawSketchRect(sprite, -20, 0, 10, 16, 0x000000);
+    SketchUtils.drawSketchRect(sprite, 20, 0, 10, 16, 0x000000);
   }
 
   static drawMuzzleFlash(sprite: PIXI.Graphics) {

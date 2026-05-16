@@ -43,7 +43,12 @@ export const en = {
         overload: { name: "Overload", description: "SYNERGY. +30% Fire Rate, -10% Damage." },
         reactiveArmor: { name: "Reactive Armor", description: "SYNERGY. Every 4th deflection heals 15 HP." },
         predator: { name: "Predator", description: "SYNERGY. Next shot after evasion is 100% crit." },
-        autoVolley: { name: "Auto-Volley", description: "SYNERGY. Autogun fires 2 shots but has +15% cooldown." }
+        autoVolley: { name: "Auto-Volley", description: "SYNERGY. Autogun fires 2 shots but has +15% cooldown." },
+        chains: { name: "Chains", description: "Projectiles chain to nearby enemies" },
+        caliber: { name: "Large Caliber", description: "+25% Projectile Size" },
+        repulsor: { name: "Repulsor", description: "Projectiles knock back enemies" },
+        seismic: { name: "Seismic", description: "SYNERGY. Explosions knock back enemies in radius." },
+        stasis: { name: "Stasis", description: "SYNERGY. Knocked back enemies are slowed for 0.5s." }
     }
 };
 

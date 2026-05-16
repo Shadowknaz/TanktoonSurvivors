@@ -89,8 +89,8 @@ export class EffectFactory {
       5.0, // track mark lives for 5 seconds
       1.0,
       1.0,
-      0.3,
-      0.0 // fades to 0
+      GameConfig.TRACK_MARK_START_ALPHA,
+      GameConfig.TRACK_MARK_END_ALPHA
     );
   }
 

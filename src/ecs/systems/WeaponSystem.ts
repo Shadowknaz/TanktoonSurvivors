@@ -22,7 +22,8 @@ import {
   Pierce,
   ArcedProjectile,
   GameState,
-  PlayerStats
+  PlayerStats,
+  Chain
 } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
@@ -83,6 +84,10 @@ export class WeaponSystem {
           addComponent(world, projEid, Pierce);
           Pierce.count[projEid] = stats!.pierceCount;
       }
+      if (stats!.chainCount > 0) {
+          addComponent(world, projEid, Chain);
+          Chain.count[projEid] = stats!.chainCount;
+      }
     } else {
       Projectile.ownerType[projEid] = OwnerType.ENEMY;
       ContactDamage.value[projEid] = stats!.damage || GameConfig.PROJECTILE_DAMAGE_ENEMY;
@@ -95,6 +100,14 @@ export class WeaponSystem {
     const body = PoolManager.projectileBodyPool.acquire();
     Matter.Body.setPosition(body, { x: Position.x[projEid], y: Position.y[projEid] });
     Matter.Body.setAngle(body, 0);
+    
+    const sizeMult = 1.0 + (stats?.projectileSizeMult || 0);
+    Projectile.scale[projEid] = sizeMult;
+    if (sizeMult !== 1.0) {
+        Matter.Body.scale(body, sizeMult, sizeMult);
+        (body as any).currentScale = sizeMult;
+    }
+
     // Add explicitly to world if not already in it (Matter behaves better if we re-add or keep it)
     if (!physicsEngine.getBodyById(body.id)) {
         physicsEngine.addExistingBody(body);
@@ -141,7 +154,12 @@ export class WeaponSystem {
               hasAutoGun: PlayerStats.hasAutoGun[eid],
               multishotCount: PlayerStats.multishotCount[eid],
               fireRateMultiplier: PlayerStats.fireRateMultiplier[eid],
-              hasAutoVolley: PlayerStats.hasAutoVolley[eid]
+              hasAutoVolley: PlayerStats.hasAutoVolley[eid],
+              projectileSizeMult: PlayerStats.projectileSizeMult[eid],
+              knockbackForce: PlayerStats.knockbackForce[eid],
+              chainCount: PlayerStats.chainCount[eid],
+              hasSeismic: PlayerStats.hasSeismic[eid],
+              hasStasis: PlayerStats.hasStasis[eid]
           };
       } else {
           stats = enemyStats;

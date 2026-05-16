@@ -287,5 +287,65 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
       effects: [
           { type: 'setTrue', stat: 'hasAutoVolley' }
       ]
+  },
+  {
+      id: 'chains',
+      name: en.upgrades.chains.name,
+      description: en.upgrades.chains.description,
+      colorClass: 'bg-yellow-300 hover:bg-yellow-200',
+      maxLevels: 3,
+      effects: [
+          { type: 'statAdd', stat: 'chainCount', value: 1, maxValue: 3 }
+      ]
+  },
+  {
+      id: 'caliber',
+      name: en.upgrades.caliber.name,
+      description: en.upgrades.caliber.description,
+      colorClass: 'bg-stone-500 hover:bg-stone-400',
+      maxLevels: 3,
+      effects: [
+          { type: 'statAdd', stat: 'projectileSizeMult', value: 0.25, maxValue: 0.75 }
+      ]
+  },
+  {
+      id: 'repulsor',
+      name: en.upgrades.repulsor.name,
+      description: en.upgrades.repulsor.description,
+      colorClass: 'bg-cyan-500 hover:bg-cyan-400',
+      maxLevels: 3,
+      effects: [
+          { type: 'statAdd', stat: 'knockbackForce', value: 0.15, maxValue: 0.45 }
+      ]
+  },
+  {
+      id: 'seismic',
+      name: en.upgrades.seismic.name,
+      description: en.upgrades.seismic.description,
+      colorClass: 'bg-orange-700 hover:bg-orange-600',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'repulsor', minLevel: 2 },
+          { id: 'explosive', minLevel: 1 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasSeismic' }
+      ]
+  },
+  {
+      id: 'stasis',
+      name: en.upgrades.stasis.name,
+      description: en.upgrades.stasis.description,
+      colorClass: 'bg-blue-300 hover:bg-blue-200',
+      maxLevels: 1,
+      isSynergy: true,
+      requirements: [
+          { id: 'repulsor', minLevel: 3 },
+          { id: 'chains', minLevel: 2 }
+      ],
+      effects: [
+          { type: 'setTrue', stat: 'hasStasis' }
+      ]
   }
 ];
