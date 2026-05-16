@@ -13,7 +13,8 @@ import {
   TankTracks,
   Airdrop,
   AIBehavior,
-  PlayerBuffs
+  PlayerBuffs,
+  GameState
 } from "../components";
 import { PixiRenderer } from "../../views/renderers/PixiRenderer";
 import * as PIXI from "pixi.js";
@@ -25,33 +26,49 @@ import { EffectFactory } from "../factories/EffectFactory";
 import { MathUtils } from "../../utils/MathUtils";
 import { PoolManager } from "../../services/PoolManager";
 import { GameContext } from "../../models/GameContext";
+import { DeviceUtils } from "../../utils/DeviceUtils";
 
 export class RenderSystem {
   private spriteMap: Map<number, PIXI.Container> = new Map();
   private frameCount: number = 0;
 
-  update(world: World, renderer: PixiRenderer, context: GameContext, timeNow: number) {
+  update(world: World, renderer: PixiRenderer, context: GameContext, alpha: number) {
       if (!renderer.app || !renderer.app.stage) return;
       this.frameCount++;
   
-      this.updateCamera(world, renderer, context, timeNow);
+      const gameStateEntities = query(world, [GameState]);
+      if (gameStateEntities.length === 0) return;
+      const gs = gameStateEntities[0];
+      const gameTime = GameState.gameTime[gs];
+      // Interpolated game time for smooth visual effects (fog, recoil, etc.)
+      const visualTime = gameTime - GameConfig.FIXED_DELTA_TIME + (GameConfig.FIXED_DELTA_TIME * alpha);
+
+      this.updateCamera(world, renderer, context, visualTime, alpha);
       this.updateTrackMarks(world);
   
       const entities = query(world, [Position, Renderable]);
-      const activeEids = this.renderEntities(world, renderer, entities, context, timeNow);
+      const activeEids = this.renderEntities(world, renderer, entities, context, visualTime, alpha);
       
       this.cleanupSpriteMap(renderer, activeEids);
     }
   
-    private updateCamera(world: World, renderer: PixiRenderer, context: GameContext, timeNow: number) {
+    private updateCamera(world: World, renderer: PixiRenderer, context: GameContext, gameTime: number, alpha: number) {
       // Camera follow player
       const players = query(world, [PlayerControlled, Position]);
       if (players.length > 0) {
-        const px = Position.x[players[0]];
-        const py = Position.y[players[0]];
+        const eid = players[0];
+        let px = MathUtils.lerp(Position.prevX[eid], Position.x[eid], alpha);
+        let py = MathUtils.lerp(Position.prevY[eid], Position.y[eid], alpha);
+
+        if (Position.prevX[eid] === 0 && Position.prevY[eid] === 0) {
+            px = Position.x[eid];
+            py = Position.y[eid];
+        }
   
-        // Camera FOV zoom out based on timeScale
-        const targetZoom = context.timeScale > 1.0 ? 0.75 : 1.0;
+        // Camera FOV zoom out based on timeScale and device
+        const isMobile = DeviceUtils.isMobile();
+        const baseZoom = isMobile ? RenderConfig.CAMERA_ZOOM_MOBILE : RenderConfig.CAMERA_ZOOM_DESKTOP;
+        const targetZoom = (context.timeScale > 1.0 ? 0.75 : 1.0) * baseZoom;
         renderer.gameContainer.scale.x = MathUtils.lerp(renderer.gameContainer.scale.x || 1.0, targetZoom, 0.1);
         renderer.gameContainer.scale.y = renderer.gameContainer.scale.x;
   
@@ -76,8 +93,8 @@ export class RenderSystem {
         if (renderer.fogTiling) {
           // Fog moves independently - 1.05 parallax (moves slightly faster than background, appearing closer), plus time-based pan
           renderer.fogTiling.tileScale.set(renderer.gameContainer.scale.x);
-          renderer.fogTiling.tilePosition.x = (-px * 1.05 * renderer.gameContainer.scale.x) + rw / 2 + timeNow * 20;
-          renderer.fogTiling.tilePosition.y = (-py * 1.05 * renderer.gameContainer.scale.x) + rh / 2 + timeNow * 10;
+          renderer.fogTiling.tilePosition.x = (-px * 1.05 * renderer.gameContainer.scale.x) + rw / 2 + gameTime * 20;
+          renderer.fogTiling.tilePosition.y = (-py * 1.05 * renderer.gameContainer.scale.x) + rh / 2 + gameTime * 10;
         }
         
         let shake = context.cameraShake;
@@ -118,11 +135,23 @@ export class RenderSystem {
       }
     }
   
-    private renderEntities(world: World, renderer: PixiRenderer, entities: any, context: GameContext, timeNow: number): Set<number> {
+    private renderEntities(world: World, renderer: PixiRenderer, entities: any, context: GameContext, gameTime: number, alpha: number): Set<number> {
       const activeEids = new Set<number>();
       for (let i = 0; i < entities.length; i++) {
         const eid = entities[i];
         activeEids.add(eid);
+  
+        let x = MathUtils.lerp(Position.prevX[eid], Position.x[eid], alpha);
+        let y = MathUtils.lerp(Position.prevY[eid], Position.y[eid], alpha);
+        let angle = MathUtils.lerpAngle(Position.prevAngle[eid], Position.angle[eid], alpha);
+  
+        // Handle first frame (avoid dash from 0,0)
+        if (Position.prevX[eid] === 0 && Position.prevY[eid] === 0) {
+            x = Position.x[eid];
+            y = Position.y[eid];
+            angle = Position.angle[eid];
+        }
+  
         let container = this.spriteMap.get(eid);
         const spriteId = Renderable.spriteId[eid];
   
@@ -213,11 +242,10 @@ export class RenderSystem {
             shouldStepTransform = (this.frameCount + offset) % RenderConfig.STEP_RATE === 0;
         }
   
-        if (shouldStepTransform) {
-          container.x = Position.x[eid];
-          container.y = Position.y[eid];
-          container.rotation = Position.angle[eid];
-        }
+        // Always apply interpolated transforms for smoothness
+        container.x = x;
+        container.y = y;
+        container.rotation = angle;
         
         // Smear Frame logic
         let smearGraphics = container.getChildByName("smearGraphics") as PIXI.Graphics;
@@ -312,7 +340,7 @@ export class RenderSystem {
               turret.rotation = Weapon.aimAngle[eid] - Position.angle[eid];
               
               // Weapon Recoil Animation
-              const timeSinceFire = Math.max(0, timeNow - Weapon.lastFired[eid]);
+              const timeSinceFire = Math.max(0, gameTime - Weapon.lastFired[eid]);
               const recoilDuration = 0.2; // 200ms
               if (timeSinceFire < recoilDuration) {
                   // recoil goes backward (negative X) then forward

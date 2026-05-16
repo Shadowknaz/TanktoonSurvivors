@@ -23,25 +23,25 @@ export class SystemManager {
   private collisionSystem = new CollisionSystem();
   private eventSystem = new EventSystem();
 
-  update(world: World, physicsEngine: PhysicsEngine, inputViewModel: InputViewModel, pixiRenderer: PixiRenderer, deltaTime: number, timeNow: number, context: GameContext) {
+  update(world: World, physicsEngine: PhysicsEngine, inputViewModel: InputViewModel, pixiRenderer: PixiRenderer, deltaTime: number, context: GameContext, alpha: number) {
     const isPaused = context.isLevelingUp || context.isGameOver || context.isMenu;
 
     if (!isPaused) {
       this.eventSystem.update(world, physicsEngine, deltaTime, context);
-      this.spawnSystem.update(world, physicsEngine, deltaTime, timeNow, context);
+      this.spawnSystem.update(world, physicsEngine, deltaTime, context);
       this.inputSystem.update(world, inputViewModel.getState(), deltaTime, context);
-      this.aiSystem.update(world, context, physicsEngine, deltaTime, timeNow);
-      this.weaponSystem.update(world, physicsEngine, deltaTime, timeNow, context);
+      this.aiSystem.update(world, context, physicsEngine, deltaTime);
+      this.weaponSystem.update(world, physicsEngine, deltaTime, context);
       this.physicsSyncSystem.preUpdate(world, physicsEngine, deltaTime);
       
       context.updateGoldRushTimeLeft(deltaTime);
 
-      physicsEngine.step();
+      physicsEngine.step(deltaTime);
 
       this.collisionSystem.update(world, physicsEngine, deltaTime, context);
       this.physicsSyncSystem.postUpdate(world, physicsEngine);
     }
 
-    this.renderSystem.update(world, pixiRenderer, context, timeNow);                
+    this.renderSystem.update(world, pixiRenderer, context, alpha);                
   }
 }

@@ -2,13 +2,15 @@ import { PixiRenderer } from "../views/renderers/PixiRenderer";
 import { GameLoop } from "./GameLoop";
 import { PhysicsEngine } from "../services/PhysicsEngine";
 import { InputViewModel } from "../viewmodels/InputViewModel";
-import { createWorld, deleteWorld, World } from "bitecs";
+import { createWorld, deleteWorld, World, query } from "bitecs";
 import { LevelManager } from "../services/LevelManager";
 import { SystemManager } from "../services/SystemManager";
 import { PoolManager } from "../services/PoolManager";
 import { useGameStore } from "../stores/GameStore";
 import { GameContext } from "../models/GameContext";
-import { GameState } from "../models/types";
+import { GameState as GameStateEnum } from "../models/types";
+import { GameState } from "../ecs/components";
+import { GameConfig } from "../config/GameConfig";
 
 export class GameApp {
   public pixiRenderer: PixiRenderer;
@@ -18,7 +20,6 @@ export class GameApp {
   public world: World;
   private systemManager: SystemManager;
   private isDestroyed = false;
-  private appTime = 0;
   private lastFpsTime = 0;
   private fps = 0;
   private frames = 0;
@@ -29,8 +30,14 @@ export class GameApp {
     this.physicsEngine = new PhysicsEngine();
     this.inputViewModel = new InputViewModel();
     this.systemManager = new SystemManager();
+    
+    useGameStore.getState().setInputViewModel(this.inputViewModel);
 
-    this.gameLoop = new GameLoop(this.update.bind(this));
+    this.gameLoop = new GameLoop(
+        this.update.bind(this), 
+        GameConfig.FIXED_DELTA_TIME,
+        () => useGameStore.getState().timeScale
+    );
   }
 
   async init(container: HTMLElement) {
@@ -49,7 +56,7 @@ export class GameApp {
      return {
          isGameOver: state.isGameOver(),
          isLevelingUp: state.isLevelingUp(),
-         isMenu: state.gameState === GameState.MENU,
+         isMenu: state.gameState === GameStateEnum.MENU,
          cameraShake: state.cameraShake,
          screenShakeEnabled: state.settings.screenShake,
          playerStats: state.playerStats,
@@ -62,7 +69,7 @@ export class GameApp {
          timeScale: state.timeScale,
 
          setPlayerHealth: state.setPlayerHealth,
-         setGameOver: (stateBool) => state.setGameState(stateBool ? GameState.GAME_OVER : GameState.PLAYING),
+         setGameOver: (stateBool) => state.setGameState(stateBool ? GameStateEnum.GAME_OVER : GameStateEnum.PLAYING),
          triggerGoldRush: state.triggerGoldRush,
          updateGoldRushTimeLeft: state.updateGoldRushTimeLeft,
          incrementTotalKills: state.incrementTotalKills,
@@ -75,15 +82,16 @@ export class GameApp {
      };
   }
 
-  private update(deltaTime: number, timeNow: number) {
+  private update(deltaTime: number) {
     if (this.isDestroyed) return;
     
-    // FPS counter
+    // FPS counter (Purely visual, okay to use performance.now)
+    const now = performance.now() / 1000;
     this.frames++;
-    if (timeNow - this.lastFpsTime >= 1.0) {
-      this.fps = Math.round(this.frames / (timeNow - this.lastFpsTime));
+    if (now - this.lastFpsTime >= 1.0) {
+      this.fps = Math.round(this.frames / (now - this.lastFpsTime));
       this.frames = 0;
-      this.lastFpsTime = timeNow;
+      this.lastFpsTime = now;
       useGameStore.getState().setFps(this.fps);
     }
     
@@ -92,11 +100,16 @@ export class GameApp {
     
     const context = this.getGameContext();
     
-    // Dilate time
-    const scaledDeltaTime = deltaTime * context.timeScale;
-    this.appTime += scaledDeltaTime;
+    // Sync Store timeScale to ECS for determinism
+    const gameStateEntities = query(this.world, [GameState]);
+    if (gameStateEntities.length > 0) {
+        const gs = gameStateEntities[0];
+        GameState.timeScale[gs] = context.timeScale;
+        GameState.gameTime[gs] += deltaTime; // Incremented by fixed delta
+    }
 
-    this.systemManager.update(this.world, this.physicsEngine, this.inputViewModel, this.pixiRenderer, scaledDeltaTime, this.appTime, context);
+    const alpha = this.gameLoop.getAlpha();
+    this.systemManager.update(this.world, this.physicsEngine, this.inputViewModel, this.pixiRenderer, deltaTime, context, alpha);
   }
 
   destroy() {

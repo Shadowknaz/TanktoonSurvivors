@@ -8,6 +8,15 @@ import Matter from "matter-js";
 
 export class PhysicsSyncSystem {
   preUpdate(world: World, physicsEngine: PhysicsEngine, deltaTime: number) {
+    // Save previous state for interpolation
+    const allPositioned = query(world, [Position]);
+    for (let i = 0; i < allPositioned.length; i++) {
+        const eid = allPositioned[i];
+        Position.prevX[eid] = Position.x[eid];
+        Position.prevY[eid] = Position.y[eid];
+        Position.prevAngle[eid] = Position.angle[eid];
+    }
+
     const airdrops = query(world, [Airdrop]);
     for (let i = 0; i < airdrops.length; i++) {
         const eid = airdrops[i];

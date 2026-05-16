@@ -7,6 +7,7 @@ import { MathUtils } from "../../utils/MathUtils";
 import { EffectFactory } from "../factories/EffectFactory";
 import { EventConfig } from "../../config/EventConfig";
 import { GameContext } from "../../models/GameContext";
+import { RandomUtils } from "../../utils/RandomUtils";
 
 export class InputSystem {
   update(world: World, inputState: InputState, dt: number, context: GameContext) {
@@ -24,7 +25,7 @@ export class InputSystem {
       if (PlayerBuffs.speedTimer[eid] > 0) {
         PlayerBuffs.speedTimer[eid]--;
         newBuff = { name: "SPEED+", timer: PlayerBuffs.speedTimer[eid], maxTimer: EventConfig.LOOT_SPEED_DURATION, color: "text-yellow-400 bg-yellow-500" };
-        if (Math.random() < 0.2) {
+        if (RandomUtils.random() < 0.2) {
           EffectFactory.spawnComicEffect(world, px, py, 2); // BAM effect occasionally for speed
         }
       } else if (PlayerBuffs.invulnTimer[eid] > 0) {
@@ -32,8 +33,8 @@ export class InputSystem {
         // Only show UI buff for long loot drops, not damage i-frames (which are usually < 60 frames)
         if (PlayerBuffs.invulnTimer[eid] > 60 || context.activeBuff?.name === "INVULNERABLE") {
             newBuff = { name: "INVULNERABLE", timer: PlayerBuffs.invulnTimer[eid], maxTimer: EventConfig.LOOT_INVULN_DURATION, color: "text-blue-400 bg-blue-500" };
-            if (Math.random() < 0.1) {
-              EffectFactory.spawnParticleBubble(world, px + (Math.random() - 0.5) * 40, py + (Math.random() - 0.5) * 40); // Bubbles for invuln
+            if (RandomUtils.random() < 0.1) {
+              EffectFactory.spawnParticleBubble(world, px + (RandomUtils.random() - 0.5) * 40, py + (RandomUtils.random() - 0.5) * 40); // Bubbles for invuln
             }
         }
       }
@@ -42,8 +43,8 @@ export class InputSystem {
            context.setActiveBuff(newBuff);
       }
 
-      const rw = window.innerWidth;
-      const rh = window.innerHeight;
+      const rw = GameConfig.VIRTUAL_WIDTH;
+      const rh = GameConfig.VIRTUAL_HEIGHT;
 
       const worldMouseX = px + (inputState.mousePosition.x - rw / 2);
       const worldMouseY = py + (inputState.mousePosition.y - rh / 2);
@@ -112,7 +113,7 @@ export class InputSystem {
         
         // Spawn smoke
         for (let j = 0; j < 15; j++) {
-            EffectFactory.spawnParticleBubble(world, px + (Math.random() - 0.5) * 50, py + (Math.random() - 0.5) * 50);
+            EffectFactory.spawnParticleBubble(world, px + (RandomUtils.random() - 0.5) * 50, py + (RandomUtils.random() - 0.5) * 50);
         }
       }
 
@@ -144,9 +145,9 @@ export class InputSystem {
           Math.min(1, GameConfig.PLAYER_CHASSIS_ROTATION_SPEED * dt)
         );
 
-        if (Math.random() < GameConfig.PARTICLE_SPAWN_CHANCE_MOVING) {
-          const offsetX = (Math.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
-          const offsetY = (Math.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
+        if (RandomUtils.random() < GameConfig.PARTICLE_SPAWN_CHANCE_MOVING) {
+          const offsetX = (RandomUtils.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
+          const offsetY = (RandomUtils.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
           EffectFactory.spawnParticleBubble(world, px + offsetX, py + offsetY);
         }
       }

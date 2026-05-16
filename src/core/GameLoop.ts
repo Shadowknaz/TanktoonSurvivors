@@ -1,9 +1,18 @@
 export class GameLoop {
   private lastTime: number = 0;
+  private accumulator: number = 0;
   private animationFrameId: number | null = null;
   public frameCount: number = 0;
 
-  constructor(private updateFn: (deltaTime: number, timeNow: number) => void) {}
+  constructor(
+    private updateFn: (deltaTime: number) => void,
+    private fixedDeltaTime: number = 1 / 60,
+    private getTimeScaleFn: () => number = () => 1.0
+  ) {}
+
+  public getAlpha(): number {
+    return this.accumulator / this.fixedDeltaTime;
+  }
 
   start() {
     this.lastTime = performance.now();
@@ -19,14 +28,18 @@ export class GameLoop {
 
   private loop(time: number) {
     this.frameCount++;
+    
     // Convert to seconds
-    let deltaTime = (time - this.lastTime) / 1000;
+    const frameTime = (time - this.lastTime) / 1000;
     this.lastTime = time;
 
-    // Prevent massive jumps
-    if (deltaTime > 0.1) deltaTime = 0.1;
+    // Accumulate time scaled by game speed
+    this.accumulator += frameTime * this.getTimeScaleFn();
 
-    this.updateFn(deltaTime, time / 1000);
+    while (this.accumulator >= this.fixedDeltaTime) {
+      this.updateFn(this.fixedDeltaTime);
+      this.accumulator -= this.fixedDeltaTime;
+    }
 
     this.animationFrameId = requestAnimationFrame(this.loop.bind(this));
   }

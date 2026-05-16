@@ -4,10 +4,12 @@ import { GameConfig } from '../config/GameConfig';
 import { GameState } from '../models/types';
 import { en } from '../localization/en';
 import { MainMenu } from './MainMenu';
+import { DeviceUtils } from '../utils/DeviceUtils';
 
 export const UIOverlay: React.FC = () => {
     const store = useGameStore();
     const { playerHealth, playerMaxHealth, playerExp, playerNextLevelExp, playerLevel, currentLevelUpOptions, acquiredUpgrades, endLevelUp, currentSpeed, activeBuff, gameState, fps } = store;
+    const isMobile = DeviceUtils.isMobile();
 
     const [isInputLocked, setIsInputLocked] = useState(false);
 
@@ -65,7 +67,7 @@ export const UIOverlay: React.FC = () => {
 
                 <div className="flex justify-between items-start w-full gap-4">
                 {/* Left side stats */}
-                <div className="flex flex-col gap-3 w-full max-w-sm pointer-events-auto transform -skew-x-6">
+                <div className={`flex flex-col gap-3 w-full max-w-sm pointer-events-auto transform -skew-x-6 origin-top-left ${isMobile ? 'scale-75' : ''}`}>
                     <div className="w-full bg-[#fdfbf7] h-8 rounded-none border-4 border-black p-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] relative overflow-hidden">
                         <div 
                             className="h-full bg-red-500 transition-none"
@@ -96,7 +98,7 @@ export const UIOverlay: React.FC = () => {
                 </div>
 
                 {/* Right side acquired upgrades */}
-                <div className="flex flex-col gap-1 w-48 max-h-[40vh] overflow-y-auto no-scrollbar pointer-events-auto pr-1">
+                <div className={`flex flex-col gap-1 w-48 max-h-[40vh] overflow-y-auto no-scrollbar pointer-events-auto pr-1 origin-top-right ${isMobile ? 'scale-75' : ''}`}>
                     {acquiredUpgrades.map((u) => (
                         <div key={u.option.id} className={`${u.option.colorClass} opacity-90 border-4 border-black px-2 py-1 text-xs font-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex justify-between items-center w-full transform skew-x-3`}>
                             <span className="truncate mr-2 uppercase">{u.option.name}</span>
@@ -109,7 +111,7 @@ export const UIOverlay: React.FC = () => {
 
             {/* Bottom section for Active Buff */}
             {activeBuff && activeBuff.timer > 0 && (
-                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 pointer-events-auto">
+                <div className={`absolute bottom-12 left-1/2 -translate-x-1/2 pointer-events-auto ${isMobile ? 'scale-75' : ''}`}>
                     <div className="bg-[#dfd3c3] border-[6px] border-black p-3 shadow-[8px_8px_0_0_rgba(0,0,0,1)] w-80 transform -rotate-3 skew-x-6 relative">
                         {/* Tape effect */}
                         <div className="absolute -top-4 left-1/2 w-20 h-8 bg-[#f5f5f5] -translate-x-1/2 rotate-6 border-2 border-black shadow-sm z-10 block" />
@@ -130,8 +132,8 @@ export const UIOverlay: React.FC = () => {
 
             {isLevelingUp && !isGameOver && (
                <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-auto z-50 animate-fade-in">
-                   <div className="bg-[#fdfbf7] p-6 md:p-10 border-8 border-black shadow-[20px_20px_0_0_rgba(0,0,0,1)] text-center w-full max-w-4xl max-h-screen overflow-y-auto animate-pop-in">
-                       <h1 className="text-6xl font-black mb-8 uppercase tracking-tighter text-black drop-shadow-[4px_4px_0_rgba(255,255,100,1)]">
+                   <div className={`bg-[#fdfbf7] p-6 md:p-10 border-8 border-black shadow-[20px_20px_0_0_rgba(0,0,0,1)] text-center w-full max-w-4xl max-h-screen overflow-y-auto animate-pop-in ${isMobile ? 'scale-90' : ''}`}>
+                       <h1 className={`${isMobile ? 'text-4xl' : 'text-6xl'} font-black mb-8 uppercase tracking-tighter text-black drop-shadow-[4px_4px_0_rgba(255,255,100,1)]`}>
                            {en.levelUp}
                        </h1>
                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -155,8 +157,8 @@ export const UIOverlay: React.FC = () => {
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center pointer-events-auto z-50">
                     <div className="bg-[#ff3333] p-12 border-[12px] border-black shadow-[24px_24px_0_0_rgba(0,0,0,1)] text-center transform scale-110 rotate-3 skew-x-3">
                         <div className="relative">
-                            <span className="absolute -top-1 -left-1 text-black font-black text-8xl uppercase tracking-tighter mix-blend-overlay">{en.wasted}</span>
-                            <h1 className="text-8xl font-black mb-6 uppercase tracking-tighter text-white drop-shadow-[8px_8px_0_rgba(0,0,0,1)] relative z-10" style={{ WebkitTextStroke: '4px black' }}>
+                            <span className={`absolute -top-1 -left-1 text-black font-black ${isMobile ? 'text-6xl' : 'text-8xl'} uppercase tracking-tighter mix-blend-overlay`}>{en.wasted}</span>
+                            <h1 className={`${isMobile ? 'text-6xl' : 'text-8xl'} font-black mb-6 uppercase tracking-tighter text-white drop-shadow-[8px_8px_0_rgba(0,0,0,1)] relative z-10`} style={{ WebkitTextStroke: isMobile ? '2px black' : '4px black' }}>
                                 {en.wasted}
                             </h1>
                         </div>

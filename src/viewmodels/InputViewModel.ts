@@ -143,23 +143,46 @@ export class InputViewModel {
   }
 
   onTouchStart(event: TouchEvent): void {
-    if (event.touches.length > 0) {
-      this.handlePointerPosition(event.touches[0].clientX, event.touches[0].clientY);
+    // We use the first changed touch that isn't handled by UI (UI stops propagation)
+    if (event.changedTouches.length > 0) {
+      const touch = event.changedTouches[0];
+      this.handlePointerPosition(touch.clientX, touch.clientY);
       this.state.isMouseDown = true;
       this.state.isShooting = true;
-      event.preventDefault();
+      // Do not preventDefault here to allow UI elements to still function if needed, 
+      // but usually stopPropagation on UI is enough.
     }
   }
 
   onTouchMove(event: TouchEvent): void {
-    if (event.touches.length > 0) {
-      this.handlePointerPosition(event.touches[0].clientX, event.touches[0].clientY);
-      event.preventDefault();
+    if (event.changedTouches.length > 0) {
+      const touch = event.changedTouches[0];
+      this.handlePointerPosition(touch.clientX, touch.clientY);
     }
   }
 
   onTouchEnd(event: TouchEvent): void {
     this.state.isMouseDown = false;
     this.state.isShooting = false;
+  }
+
+  // --- Mobile Specific Methods ---
+
+  setMobileMove(x: number, y: number): void {
+    // x and y should be normalized vectors (-1 to 1)
+    this.state.moveLeft = x < -0.2;
+    this.state.moveRight = x > 0.2;
+    this.state.moveUp = y < -0.2;
+    this.state.moveDown = y > 0.2;
+  }
+
+  setMobileAction(action: "dash", active: boolean): void {
+    if (action === "dash") {
+      this.state.isDashing = active;
+    }
+  }
+
+  setMobileAim(x: number, y: number): void {
+     this.state.mousePosition = { x, y };
   }
 }

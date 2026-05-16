@@ -97,8 +97,8 @@ export class PhysicsEngine {
     this.bodiesMap.set(body.id, body);
   }
 
-  step(): void {
-    Matter.Engine.update(this.engine);
+  step(dt: number): void {
+    Matter.Engine.update(this.engine, dt * 1000);
   }
 
   destroy(): void {

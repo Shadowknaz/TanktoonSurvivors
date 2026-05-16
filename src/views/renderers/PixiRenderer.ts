@@ -180,10 +180,13 @@ export class PixiRenderer {
   async init(parent: HTMLElement) {
     if (!this.app) return;
 
+    const isMobile = parent.clientWidth < 1024; // Simple mobile check for renderer
+    const maxDPR = isMobile ? 1.5 : 2;
+    
     this.initPromise = this.app.init({
-      resizeTo: window,
+      resizeTo: parent,
       backgroundColor: RenderConfig.COLOR_BACKGROUND,
-      resolution: window.devicePixelRatio || 1,
+      resolution: Math.min(maxDPR, window.devicePixelRatio || 1),
       autoDensity: true,
       antialias: false,
     });
@@ -208,14 +211,14 @@ export class PixiRenderer {
 
       this.bgTiling = new PIXI.TilingSprite({
         texture: bgTexture,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: parent.clientWidth,
+        height: parent.clientHeight,
       });
 
       this.fogTiling = new PIXI.TilingSprite({
         texture: fogTexture,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: parent.clientWidth,
+        height: parent.clientHeight,
       });
 
 
@@ -229,8 +232,8 @@ export class PixiRenderer {
       const noiseTex = this.generatePaperTexture();
       const paperOverlay = new PIXI.TilingSprite({
         texture: noiseTex,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: parent.clientWidth,
+        height: parent.clientHeight,
         alpha: 0.15,
         blendMode: 'multiply'
       });
@@ -238,17 +241,19 @@ export class PixiRenderer {
       this.app.stage.addChild(paperOverlay);
 
       this.resizeListener = () => {
+        const width = parent.clientWidth;
+        const height = parent.clientHeight;
         if (this.bgTiling) {
-          this.bgTiling.width = window.innerWidth;
-          this.bgTiling.height = window.innerHeight;
+          this.bgTiling.width = width;
+          this.bgTiling.height = height;
         }
         if (this.fogTiling) {
-          this.fogTiling.width = window.innerWidth;
-          this.fogTiling.height = window.innerHeight;
+          this.fogTiling.width = width;
+          this.fogTiling.height = height;
         }
         if (paperOverlay) {
-          paperOverlay.width = window.innerWidth;
-          paperOverlay.height = window.innerHeight;
+          paperOverlay.width = width;
+          paperOverlay.height = height;
         }
       };
       window.addEventListener('resize', this.resizeListener!);

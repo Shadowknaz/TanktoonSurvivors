@@ -1,4 +1,9 @@
 export const GameConfig = {
+  // Timing & Determinism
+  FIXED_DELTA_TIME: 1 / 60,
+  VIRTUAL_WIDTH: 1920,
+  VIRTUAL_HEIGHT: 1080,
+
   // Background & Map Generation
   MAP_WIDTH: 2000,
   MAP_HEIGHT: 2000,

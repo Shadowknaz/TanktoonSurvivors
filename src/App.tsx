@@ -2,10 +2,14 @@ import { useEffect, useRef } from "react";
 import { GameApp } from "./core/GameApp";
 import { UIOverlay } from "./components/UIOverlay";
 import { RenderConfig } from "./config/RenderConfig";
+import { DeviceUtils } from "./utils/DeviceUtils";
+import { MobileControls } from "./components/ui/MobileControls";
+import { OrientationGuard } from "./components/OrientationGuard";
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameAppRef = useRef<GameApp | null>(null);
+  const isMobile = DeviceUtils.isMobile();
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -32,16 +36,18 @@ export default function App() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-gray-900 overflow-hidden">
       <div
-        className="shadow-2xl overflow-hidden rounded-lg aspect-video max-h-screen relative bg-[#fdfbf7]"
-        style={{
+        className={`shadow-2xl overflow-hidden relative bg-[#fdfbf7] ${isMobile ? 'w-full h-full' : 'rounded-lg aspect-video max-h-screen'}`}
+        style={!isMobile ? {
           width: RenderConfig.SCREEN_WIDTH,
           height: RenderConfig.SCREEN_HEIGHT,
           maxWidth: "100%",
           maxHeight: "100%",
-        }}
+        } : {}}
       >
         <div id="game-container" ref={containerRef} className="absolute inset-0" />
         <UIOverlay />
+        {isMobile && <MobileControls />}
+        {isMobile && <OrientationGuard />}
       </div>
     </div>
   );

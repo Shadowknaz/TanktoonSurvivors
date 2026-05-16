@@ -1,3 +1,5 @@
+import { RandomUtils } from "./RandomUtils";
+
 export class MathUtils {
   static distance(x1: number, y1: number, x2: number, y2: number): number {
     return Math.hypot(x2 - x1, y2 - y1);
@@ -23,7 +25,7 @@ export class MathUtils {
   }
 
   static randomRange(min: number, max: number): number {
-    return min + Math.random() * (max - min);
+    return min + RandomUtils.random() * (max - min);
   }
 
   static normalize(x: number, y: number): { x: number; y: number } {

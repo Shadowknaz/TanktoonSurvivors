@@ -3,6 +3,7 @@ import { GameConfig } from "../config/GameConfig";
 import { UpgradeId, UPGRADE_OPTIONS, UpgradeOption } from "../config/Upgrades";
 import { RandomUtils } from "../utils/RandomUtils";
 import { GameState } from "../models/types";
+import { InputViewModel } from "../viewmodels/InputViewModel";
 
 export interface PerkEffect {
   type: "damage" | "health" | "speed" | "fireRate" | "other";
@@ -69,6 +70,7 @@ interface GameStore {
     evasionChance: number;
     critChance: number;
   };
+  inputViewModel: InputViewModel | null;
 
   // Derived getters
   isGameOver: () => boolean;
@@ -95,6 +97,7 @@ interface GameStore {
   setTimeScale: (scale: number, duration: number) => void;
   updateTimeScale: (dt: number) => void;
   setFps: (fps: number) => void;
+  setInputViewModel: (input: InputViewModel) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -140,6 +143,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     evasionChance: 0,
     critChance: 0,
   },
+  inputViewModel: null,
 
   isGameOver: () => get().gameState === GameState.GAME_OVER,
   isLevelingUp: () => get().gameState === GameState.LEVEL_UP,
@@ -238,7 +242,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           });
 
           // Generate 3 random distinct upgrades
-          const shuffled = [...availableOptions].sort(() => 0.5 - Math.random());
+          const shuffled = [...availableOptions].sort(() => 0.5 - RandomUtils.random());
           newOptions = shuffled.slice(0, 3);
       }
       return { playerExp: newExp, gameState: newGameState, currentLevelUpOptions: newOptions };
@@ -298,5 +302,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
           currentLevelUpOptions: [],
           acquiredUpgrades: acquired,
       };
-  })
+  }),
+  setInputViewModel: (inputViewModel) => set({ inputViewModel })
 }));

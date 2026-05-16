@@ -4,6 +4,9 @@ export const Position = defineComponent({
   x: Types.f32,
   y: Types.f32,
   angle: Types.f32,
+  prevX: Types.f32,
+  prevY: Types.f32,
+  prevAngle: Types.f32,
 });
 export const Velocity = defineComponent({ x: Types.f32, y: Types.f32 });
 export const Health = defineComponent({ max: Types.f32, current: Types.f32 });
@@ -190,4 +193,17 @@ export const ArcedProjectile = defineComponent({
   targetY: Types.f32,
   progress: Types.f32, // 0 to 1
   speed: Types.f32,
+});
+
+export const GameState = defineComponent({
+  killStreak: Types.ui32,
+  killStreakTimer: Types.f32,
+  spawnTimer: Types.f32,
+  gameTime: Types.f32,
+  timeScale: Types.f32,
+});
+
+export const MapBounds = defineComponent({
+  width: Types.f32,
+  height: Types.f32,
 });

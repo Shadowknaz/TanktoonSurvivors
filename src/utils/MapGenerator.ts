@@ -1,5 +1,6 @@
 import { GameConfig } from "../config/GameConfig";
 import { MapUtils } from "./MapUtils";
+import { RandomUtils } from "./RandomUtils";
 
 export interface EnvironmentProp {
   x: number;
@@ -20,10 +21,10 @@ export class MapGenerator {
         props.push({
             x: pos.x,
             y: pos.y,
-            width: 200 + Math.random() * 300,
-            height: 200 + Math.random() * 300,
+            width: 200 + RandomUtils.random() * 300,
+            height: 200 + RandomUtils.random() * 300,
             type: "dirt_patch",
-            rotation: Math.random() * Math.PI * 2,
+            rotation: RandomUtils.random() * Math.PI * 2,
         });
     }
 
@@ -53,14 +54,14 @@ export class MapGenerator {
     let placeAttempts = 0;
     let placed = 0;
     while (placed < GameConfig.RAVINE_COUNT && placeAttempts < 1000) {
-      const rw = 150 + Math.random() * 200;
-      const rh = 80 + Math.random() * 100;
+      const rw = 150 + RandomUtils.random() * 200;
+      const rh = 80 + RandomUtils.random() * 100;
       const maxR = Math.max(rw, rh) / 2;
       const pos = MapUtils.getRandomPosition(maxR);
       const x = pos.x;
       const y = pos.y;
       if (!checkOverlap(x, y, maxR + 50)) {
-        props.push({ x, y, width: rw, height: rh, type: "ravine", rotation: Math.random() * Math.PI * 2 });
+        props.push({ x, y, width: rw, height: rh, type: "ravine", rotation: RandomUtils.random() * Math.PI * 2 });
         placed++;
       }
       placeAttempts++;
@@ -68,15 +69,15 @@ export class MapGenerator {
 
     // Place houses and broken houses
     const tryPlaceBuilding = (type: "house" | "broken_house") => {
-      const hW = 150 + Math.random() * 150;
-      const hH = 150 + Math.random() * 150;
+      const hW = 150 + RandomUtils.random() * 150;
+      const hH = 150 + RandomUtils.random() * 150;
       const maxR = Math.max(hW, hH) / 2;
       const pos = MapUtils.getRandomPosition(maxR);
       const x = pos.x;
       const y = pos.y;
 
       if (!checkOverlap(x, y, maxR + 50)) {
-        props.push({ x, y, width: hW, height: hH, type, rotation: Math.random() * 0.5 - 0.25 });
+        props.push({ x, y, width: hW, height: hH, type, rotation: RandomUtils.random() * 0.5 - 0.25 });
         return true;
       }
       return false;
@@ -97,7 +98,7 @@ export class MapGenerator {
     // Place trees
     placeAttempts = 0; placed = 0;
     while (placed < GameConfig.TREE_COUNT && placeAttempts < 2000) {
-      const r = 20 + Math.random() * 30;
+      const r = 20 + RandomUtils.random() * 30;
       const pos = MapUtils.getRandomPosition(r);
       const x = pos.x;
       const y = pos.y;

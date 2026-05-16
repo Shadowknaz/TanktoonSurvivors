@@ -19,6 +19,7 @@ import {
   Renderable,
   ContactDamage,
   FireZone,
+  GameState
 } from "../components";
 import { GameConfig } from "../../config/GameConfig";
 import { EffectFactory } from "../factories/EffectFactory";
@@ -28,6 +29,7 @@ import { GameContext } from "../../models/GameContext";
 import { AIState } from "../../models/types";
 import { CollisionSystem } from "./CollisionSystem";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
+import { RandomUtils } from "../../utils/RandomUtils";
 
 export class AISystem {
   private enemyGrid: SpatialGrid;
@@ -48,8 +50,14 @@ export class AISystem {
     return GameConfig.AI_DEFAULT_AVOIDANCE_RADIUS;
   }
 
-  update(world: World, context: GameContext, physicsEngine: PhysicsEngine, dt: number, timeNow: number) {
+  update(world: World, context: GameContext, physicsEngine: PhysicsEngine, dt: number) {
     if (context.isGameOver) return;
+
+    const gameStateEntities = query(world, [GameState]);
+    if (gameStateEntities.length === 0) return;
+    const gs = gameStateEntities[0];
+    const gameTime = GameState.gameTime[gs];
+
     const players = query(world, [PlayerControlled, Position]);
     if (players.length === 0) return;
     const playerEid = players[0];
@@ -89,9 +97,9 @@ export class AISystem {
         if (dist < 150 && FlamerTank.fuelLeft[eid] > 0) {
             FlamerTank.isSpraying[eid] = 1;
             FlamerTank.fuelLeft[eid] -= dt;
-            if (timeNow - FlamerTank.lastSpray[eid] > 0.3) {
+            if (gameTime - FlamerTank.lastSpray[eid] > 0.3) {
                 EffectFactory.spawnFireZone(world, Position.x[eid], Position.y[eid]);
-                FlamerTank.lastSpray[eid] = timeNow;
+                FlamerTank.lastSpray[eid] = gameTime;
             }
         } else {
             FlamerTank.isSpraying[eid] = 0;
@@ -102,9 +110,9 @@ export class AISystem {
     const fireZones = query(world, [FireZone, Position]);
     for (let i = 0; i < fireZones.length; i++) {
         const eid = fireZones[i];
-        if (timeNow - FireZone.lastTick[eid] > FireZone.tickRate[eid]) {
+        if (gameTime - FireZone.lastTick[eid] > FireZone.tickRate[eid]) {
             CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], 50, FireZone.tickDamage[eid], 0, context);
-            FireZone.lastTick[eid] = timeNow;
+            FireZone.lastTick[eid] = gameTime;
         }
     }
 
@@ -127,12 +135,12 @@ export class AISystem {
         let currentState = AIBehavior.state[eid] || AIState.PATROL;
         const hpRatio = hasComponent(world, eid, Health) ? Health.current[eid] / Health.max[eid] : 1;
 
-        currentState = this.updateAIState(world, eid, currentState, dist, hpRatio, isKamikaze, dt, timeNow);
+        currentState = this.updateAIState(world, eid, currentState, dist, hpRatio, isKamikaze, dt, gameTime);
         AIBehavior.state[eid] = currentState;
 
         const { moveX, moveY } = this.calculateMovement(eid, currentState, dist, dx, dy, isRammer, isKamikaze);
         
-        this.applyMovement(eid, moveX, moveY, sepX, sepY, avoidX, avoidY);
+        this.applyMovement(eid, moveX, moveY, sepX, sepY, avoidX, avoidY, dt);
 
         if (hasComponent(world, eid, Weapon)) {
             this.aimAtPlayer(eid, playerEid, dx, dy);
@@ -230,7 +238,7 @@ export class AISystem {
             if (currentState === AIState.ATTACK && dist < GameConfig.AI_VIEW_RADIUS_PX) {
                 const cooldown = Weapon.cooldown[eid];
                 if (timeNow - Weapon.lastFired[eid] >= cooldown) {
-                    if (Math.random() < 0.05) {
+                    if (RandomUtils.random() < 0.05) {
                         currentState = AIState.WINDUP;
                         Weapon.windUpTimer[eid] = Weapon.maxWindUpTimer[eid] || 0.4;
                     }
@@ -284,7 +292,7 @@ export class AISystem {
     return { moveX: dist > 0 ? moveX : 0, moveY: dist > 0 ? moveY : 0 };
   }
 
-  private applyMovement(eid: number, moveX: number, moveY: number, sepX: number, sepY: number, avoidX: number, avoidY: number) {
+  private applyMovement(eid: number, moveX: number, moveY: number, sepX: number, sepY: number, avoidX: number, avoidY: number, dt: number) {
       const targetForceX = moveX + sepX * GameConfig.AI_STEERING_WEIGHTS.separation + avoidX * GameConfig.AI_STEERING_WEIGHTS.avoidObstacles;
       const targetForceY = moveY + sepY * GameConfig.AI_STEERING_WEIGHTS.separation + avoidY * GameConfig.AI_STEERING_WEIGHTS.avoidObstacles;
 
@@ -296,7 +304,7 @@ export class AISystem {
 
       if (Velocity.x[eid] !== 0 || Velocity.y[eid] !== 0) {
         const targetAngle = Math.atan2(Velocity.y[eid], Velocity.x[eid]);
-        Position.angle[eid] = MathUtils.lerpAngle(Position.angle[eid] || targetAngle, targetAngle, 0.1);
+        Position.angle[eid] = MathUtils.lerpAngle(Position.angle[eid] || targetAngle, targetAngle, 1 - Math.exp(-10 * dt));
       }
   }
 

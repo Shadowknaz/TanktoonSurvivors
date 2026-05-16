@@ -20,7 +20,8 @@ import {
   Landmine,
   Airdrop,
   Detonating,
-  FlamerTank
+  FlamerTank,
+  GameState
 } from "../components";
 import { 
   removeEntity,
@@ -34,6 +35,7 @@ import { OwnerType, ComicTextType } from "../../models/types";
 import { EffectFactory } from "../factories/EffectFactory";
 import { GameConfig } from "../../config/GameConfig";
 import { EventConfig } from "../../config/EventConfig";
+import { RandomUtils } from "../../utils/RandomUtils";
 import Matter from "matter-js";
 import { PoolManager } from "../../services/PoolManager";
 import { GameContext } from "../../models/GameContext";
@@ -49,16 +51,11 @@ const KILL_STREAK_THRESHOLDS: KillStreakThreshold[] = [
 
 
 export class CollisionSystem {
-  private static killStreak = 0;
-  private static killStreakTimer = 0;
-  private static readonly MAX_STREAK_TIME = 3.0; // seconds
-
-  static getKillStreak(): number {
-    return CollisionSystem.killStreak;
-  }
-
   static handleEnemyKill(world: World, context: GameContext, x: number, y: number, ownerType: OwnerType) {
     let xpMultiplier = 1;
+
+    const gameStates = query(world, [GameState]);
+    const gs = gameStates[0];
 
     context.incrementTotalKills();
 
@@ -66,15 +63,15 @@ export class CollisionSystem {
       xpMultiplier *= 5;
     }
 
-    if (ownerType === OwnerType.PLAYER) {
-      CollisionSystem.killStreak++;
-      CollisionSystem.killStreakTimer = CollisionSystem.MAX_STREAK_TIME;
+    if (ownerType === OwnerType.PLAYER && gs !== undefined) {
+      GameState.killStreak[gs]++;
+      GameState.killStreakTimer[gs] = 3.0; // MAX_STREAK_TIME
       
-      xpMultiplier *= (1 + CollisionSystem.killStreak * 0.05);
+      xpMultiplier *= (1 + GameState.killStreak[gs] * 0.05);
 
       let matchedThreshold: KillStreakThreshold | null = null;
       for (const t of KILL_STREAK_THRESHOLDS) {
-        if (CollisionSystem.killStreak === t.kills) {
+        if (GameState.killStreak[gs] === t.kills) {
           matchedThreshold = t;
           break;
         }
@@ -131,9 +128,9 @@ export class CollisionSystem {
                     } else {
                         const defChance = context.playerStats.deflectionChance;
                         const evaChance = context.playerStats.evasionChance;
-                        if (evaChance > 0 && Math.random() < evaChance) {
+                        if (evaChance > 0 && RandomUtils.random() < evaChance) {
                             evaded = true;
-                        } else if (defChance > 0 && Math.random() < defChance) {
+                        } else if (defChance > 0 && RandomUtils.random() < defChance) {
                             deflected = true;
                         }
                     }
@@ -142,7 +139,7 @@ export class CollisionSystem {
                 if (!deflected && !evaded) {
                     let finalDamage = damage;
                     if (ownerType === OwnerType.PLAYER) {
-                        if (Math.random() < context.playerStats.critChance) {
+                        if (RandomUtils.random() < context.playerStats.critChance) {
                             finalDamage *= 2.0;
                             EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 40, ComicTextType.BAM);
                         }
@@ -153,7 +150,7 @@ export class CollisionSystem {
                     DamageFlash.timer[eid] = GameConfig.DAMAGE_FLASH_FRAMES;
                     
                     if (ownerType === OwnerType.PLAYER && isEidEnemy && context.playerStats.lifeStealChance > 0) {
-                        if (Math.random() < context.playerStats.lifeStealChance) {
+                        if (RandomUtils.random() < context.playerStats.lifeStealChance) {
                             context.setPlayerHealth(Math.min(context.playerHealth + 5, context.playerMaxHealth), context.playerMaxHealth);
                             EffectFactory.spawnParticleBubble(world, Position.x[eid], Position.y[eid]);
                         }
@@ -182,7 +179,7 @@ export class CollisionSystem {
                             removeComponent(world, eid, Health);
                             if (!hasComponent(world, eid, Detonating)) {
                                 addComponent(world, eid, Detonating);
-                                Detonating.timer[eid] = Math.random() * 0.15 + 0.1; // Delay explosion by 100-250ms for chain reaction
+                                Detonating.timer[eid] = RandomUtils.random() * 0.15 + 0.1; // Delay explosion by 100-250ms for chain reaction
                             }
                         }
                     }
@@ -230,10 +227,13 @@ export class CollisionSystem {
   }
 
   update(world: World, physicsEngine: PhysicsEngine, dt: number, context: GameContext) {
-    if (CollisionSystem.killStreak > 0) {
-      CollisionSystem.killStreakTimer -= dt;
-      if (CollisionSystem.killStreakTimer <= 0) {
-        CollisionSystem.killStreak = 0;
+    const gameStates = query(world, [GameState]);
+    const gs = gameStates[0];
+
+    if (gs !== undefined && GameState.killStreak[gs] > 0) {
+      GameState.killStreakTimer[gs] -= dt;
+      if (GameState.killStreakTimer[gs] <= 0) {
+        GameState.killStreak[gs] = 0;
       }
     }
 
@@ -341,9 +341,9 @@ export class CollisionSystem {
             } else {
                 const defChance = context.playerStats.deflectionChance;
                 const evaChance = context.playerStats.evasionChance;
-                if (evaChance > 0 && Math.random() < evaChance) {
+                if (evaChance > 0 && RandomUtils.random() < evaChance) {
                     evaded = true;
-                } else if (defChance > 0 && Math.random() < defChance) {
+                } else if (defChance > 0 && RandomUtils.random() < defChance) {
                     deflected = true;
                 }
             }
@@ -401,7 +401,7 @@ export class CollisionSystem {
         } else {
             let finalDamage = damage;
             if (ownerType === OwnerType.PLAYER) {
-                if (Math.random() < context.playerStats.critChance) {
+                if (RandomUtils.random() < context.playerStats.critChance) {
                     finalDamage *= 2.0;
                     EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 40, ComicTextType.BAM); // Visual feedback for crit
                 }
@@ -412,7 +412,7 @@ export class CollisionSystem {
             DamageFlash.timer[targetEid] = GameConfig.DAMAGE_FLASH_FRAMES;
             
             if (ownerType === OwnerType.PLAYER && isTargetEnemy && context.playerStats.lifeStealChance > 0) {
-                if (Math.random() < context.playerStats.lifeStealChance) {
+                if (RandomUtils.random() < context.playerStats.lifeStealChance) {
                     context.setPlayerHealth(Math.min(context.playerHealth + 5, context.playerMaxHealth), context.playerMaxHealth);
                     EffectFactory.spawnParticleBubble(world, Position.x[targetEid], Position.y[targetEid]);
                 }

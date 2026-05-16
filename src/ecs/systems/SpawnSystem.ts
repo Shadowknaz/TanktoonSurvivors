@@ -1,6 +1,6 @@
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import {  query , World } from "bitecs";
-import { Position, PlayerControlled, AIBehavior } from "../components";
+import { Position, PlayerControlled, AIBehavior, GameState } from "../components";
 import { MathUtils } from "../../utils/MathUtils";
 import { MapUtils } from "../../utils/MapUtils";
 import { GameConfig } from "../../config/GameConfig";
@@ -8,24 +8,25 @@ import { RenderConfig } from "../../config/RenderConfig";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { ENEMY_SPAWN_POOL } from "../../config/EnemySpawnConfig";
 import { GameContext } from "../../models/GameContext";
-import { CollisionSystem } from "./CollisionSystem";
 
 export class SpawnSystem {
-  private spawnTimer: number = 0;
+  update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, context: GameContext) {
+    const gameStates = query(world, [GameState]);
+    const gs = gameStates[0];
+    if (gs === undefined) return;
 
-  update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, timeNow: number, context: GameContext) {
-    this.spawnTimer -= deltaTime;
+    GameState.spawnTimer[gs] -= deltaTime;
 
     // Check maximum enemies to prevent lag
     const enemies = query(world, [AIBehavior]);
     const maxEnemies = context.goldRushTimeLeft > 0 ? 150 : 80;
 
-    if (this.spawnTimer <= 0) {
+    if (GameState.spawnTimer[gs] <= 0) {
       const isGoldRush = context.goldRushTimeLeft > 0;
       let interval = GameConfig.ENEMY_SPAWN_INTERVAL_MS / 1000;
       
       // Director System: Speed up spawn if player kills quickly
-      const killStreak = CollisionSystem.getKillStreak();
+      const killStreak = GameState.killStreak[gs];
       if (killStreak > 5) {
           interval *= 0.8;
       }
@@ -37,15 +38,15 @@ export class SpawnSystem {
         interval = interval / 5.0; // 5x spawn rate!
       }
       
-      this.spawnTimer = interval;
+      GameState.spawnTimer[gs] = interval;
 
       if (enemies.length >= maxEnemies) {
           return;
       }
 
       const players = query(world, [PlayerControlled, Position]);
-      const rw = window.innerWidth;
-      const rh = window.innerHeight;
+      const rw = GameConfig.VIRTUAL_WIDTH;
+      const rh = GameConfig.VIRTUAL_HEIGHT;
       let px = rw / 2;
       let py = rh / 2;
 

@@ -20,7 +20,8 @@ import {
   AIBehavior,
   AutoWeapon,
   Pierce,
-  ArcedProjectile
+  ArcedProjectile,
+  GameState
 } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
@@ -116,7 +117,12 @@ export class WeaponSystem {
     Renderable.visible[projEid] = 1;
   }
 
-  update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, timeNow: number, context: GameContext) {
+  update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, context: GameContext) {
+    const gameStateEntities = query(world, [GameState]);
+    if (gameStateEntities.length === 0) return;
+    const gs = gameStateEntities[0];
+    const gameTime = GameState.gameTime[gs];
+
     const shooters = query(world, [Position, Weapon]);
 
     for (let i = 0; i < shooters.length; i++) {
@@ -129,7 +135,7 @@ export class WeaponSystem {
       // Ensure Player has AutoWeapon if they grabbed the upgrade
       if (isPlayer && stats?.hasAutoGun && !hasComponent(world, eid, AutoWeapon)) {
           addComponent(world, eid, AutoWeapon);
-          AutoWeapon.lastFired[eid] = timeNow;
+          AutoWeapon.lastFired[eid] = gameTime;
           AutoWeapon.cooldown[eid] = GameConfig.AUTO_GUN_COOLDOWN_MS / 1000;
           AutoWeapon.damage[eid] = GameConfig.AUTO_GUN_DAMAGE;
           AutoWeapon.range[eid] = GameConfig.AUTO_GUN_RANGE_PX;
@@ -138,7 +144,7 @@ export class WeaponSystem {
 
       // Handle Automatic Weapon
       if (hasComponent(world, eid, AutoWeapon)) {
-          if (timeNow - AutoWeapon.lastFired[eid] >= AutoWeapon.cooldown[eid]) {
+          if (gameTime - AutoWeapon.lastFired[eid] >= AutoWeapon.cooldown[eid]) {
               // Find nearest enemy
               const px = Position.x[eid];
               const py = Position.y[eid];
@@ -158,7 +164,7 @@ export class WeaponSystem {
               }
 
               if (nearestAngle !== null) {
-                  AutoWeapon.lastFired[eid] = timeNow;
+                  AutoWeapon.lastFired[eid] = gameTime;
                   const autoStats = { ...stats, damage: AutoWeapon.damage[eid], explosiveRadius: 0 };
                   this.createProjectile(world, physicsEngine, eid, px, py, nearestAngle, true, autoStats, AutoWeapon.muzzleOffset[eid]);
               }
@@ -169,8 +175,8 @@ export class WeaponSystem {
       if (Weapon.isShooting[eid] === 1) {
         const currentCooldown = isPlayer ? (Weapon.cooldown[eid] / stats!.fireRateMultiplier) : Weapon.cooldown[eid];
 
-        if (timeNow - Weapon.lastFired[eid] >= currentCooldown) {
-          Weapon.lastFired[eid] = timeNow;
+        if (gameTime - Weapon.lastFired[eid] >= currentCooldown) {
+          Weapon.lastFired[eid] = gameTime;
 
           const px = Position.x[eid];
           const py = Position.y[eid];

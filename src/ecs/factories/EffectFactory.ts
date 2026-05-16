@@ -3,6 +3,7 @@ import { Position, Renderable, Lifetime, ComicEffect, Particle, Wreck, Velocity,
 import { SpriteId, ComicTextType } from "../../models/types";
 import { GameConfig } from "../../config/GameConfig";
 import { MathUtils } from "../../utils/MathUtils";
+import { RandomUtils } from "../../utils/RandomUtils";
 
 export class EffectFactory {
   static spawnWreck(world: World, x: number, y: number, angle: number, originalSpriteId: SpriteId, lifetimeSec: number = 3.0): number {
@@ -72,9 +73,9 @@ export class EffectFactory {
     y: number,
     textType?: ComicTextType
   ): number {
-    const eid = this.spawnParticle(world, x, y, Math.random() * 0.5 - 0.25, SpriteId.COMIC_EFFECT, 0.5, 0.4, 0.8, 1.0, 1.0);
+    const eid = this.spawnParticle(world, x, y, RandomUtils.random() * 0.5 - 0.25, SpriteId.COMIC_EFFECT, 0.5, 0.4, 0.8, 1.0, 1.0);
     addComponent(world, eid, ComicEffect);
-    ComicEffect.textType[eid] = textType ?? Math.floor(Math.random() * 4);
+    ComicEffect.textType[eid] = textType ?? Math.floor(RandomUtils.random() * 4);
     return eid;
   }
 
@@ -109,31 +110,31 @@ export class EffectFactory {
   }
 
   static spawnSmokeCloud(world: World, x: number, y: number): void {
-    const numClouds = 3 + Math.floor(Math.random() * 3);
+    const numClouds = 3 + Math.floor(RandomUtils.random() * 3);
     for (let i = 0; i < numClouds; i++) {
-        const offsetX = (Math.random() - 0.5) * 30;
-        const offsetY = (Math.random() - 0.5) * 30;
+        const offsetX = (RandomUtils.random() - 0.5) * 30;
+        const offsetY = (RandomUtils.random() - 0.5) * 30;
         
         // Stagger lifetime strongly so they fade one by one
-        const lifetime = (GameConfig.SMOKE_CLOUD_BASE_LIFETIME * 0.4) + (i * 1.5) + Math.random();
+        const lifetime = (GameConfig.SMOKE_CLOUD_BASE_LIFETIME * 0.4) + (i * 1.5) + RandomUtils.random();
         
         const eid = this.spawnParticle(
           world, 
           x + offsetX, 
           y + offsetY, 
-          Math.random() * Math.PI * 2, 
+          RandomUtils.random() * Math.PI * 2, 
           SpriteId.SMOKE_CLOUD, 
           lifetime, 
-          GameConfig.SMOKE_CLOUD_START_SCALE * (0.8 + Math.random() * 0.4), 
-          GameConfig.SMOKE_CLOUD_END_SCALE * (0.8 + Math.random() * 0.4), 
+          GameConfig.SMOKE_CLOUD_START_SCALE * (0.8 + RandomUtils.random() * 0.4), 
+          GameConfig.SMOKE_CLOUD_END_SCALE * (0.8 + RandomUtils.random() * 0.4), 
           GameConfig.SMOKE_CLOUD_START_ALPHA, 
           0.0
         );
 
         // Add slow drift velocity
         addComponent(world, eid, Velocity);
-        Velocity.x[eid] = (Math.random() - 0.5) * 10;
-        Velocity.y[eid] = (Math.random() - 0.5) * 10;
+        Velocity.x[eid] = (RandomUtils.random() - 0.5) * 10;
+        Velocity.y[eid] = (RandomUtils.random() - 0.5) * 10;
     }
   }
 
@@ -141,14 +142,14 @@ export class EffectFactory {
     const startScale = MathUtils.lerp(
       GameConfig.PARTICLE_CLOUD_START_SCALE_MIN,
       GameConfig.PARTICLE_CLOUD_START_SCALE_MAX,
-      Math.random()
+      RandomUtils.random()
     );
-    const lifetime = GameConfig.PARTICLE_CLOUD_BASE_LIFETIME * (0.8 + Math.random() * 0.4);
+    const lifetime = GameConfig.PARTICLE_CLOUD_BASE_LIFETIME * (0.8 + RandomUtils.random() * 0.4);
     return this.spawnParticle(
       world, 
       x, 
       y, 
-      Math.random() * Math.PI * 2, 
+      RandomUtils.random() * Math.PI * 2, 
       SpriteId.PARTICLE_BUBBLE, 
       lifetime, 
       startScale, 
