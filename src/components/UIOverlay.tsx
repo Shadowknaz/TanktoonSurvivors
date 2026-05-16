@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../stores/GameStore';
 import { GameConfig } from '../config/GameConfig';
 import { GameState } from '../models/types';
@@ -9,9 +9,22 @@ export const UIOverlay: React.FC = () => {
     const store = useGameStore();
     const { playerHealth, playerMaxHealth, playerExp, playerNextLevelExp, playerLevel, currentLevelUpOptions, acquiredUpgrades, endLevelUp, currentSpeed, activeBuff, gameState, fps } = store;
 
+    const [isInputLocked, setIsInputLocked] = useState(false);
+
+    const isLevelingUp = gameState === GameState.LEVEL_UP;
+
+    useEffect(() => {
+        if (isLevelingUp) {
+            setIsInputLocked(true);
+            const timer = setTimeout(() => {
+                setIsInputLocked(false);
+            }, GameConfig.UI_INPUT_LOCK_MS);
+            return () => clearTimeout(timer);
+        }
+    }, [isLevelingUp]);
+
     const isMenu = gameState === GameState.MENU;
     const isGameOver = gameState === GameState.GAME_OVER;
-    const isLevelingUp = gameState === GameState.LEVEL_UP;
     const goldRushTimeLeft = store.goldRushTimeLeft;
     
     const isGoldRush = goldRushTimeLeft > 0;
@@ -116,8 +129,8 @@ export const UIOverlay: React.FC = () => {
             )}
 
             {isLevelingUp && !isGameOver && (
-               <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-auto backdrop-blur-sm z-50">
-                   <div className="bg-[#fdfbf7] p-6 md:p-10 border-8 border-black shadow-[20px_20px_0_0_rgba(0,0,0,1)] text-center w-full max-w-4xl max-h-screen overflow-y-auto transform -rotate-2">
+               <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-auto z-50 animate-fade-in">
+                   <div className="bg-[#fdfbf7] p-6 md:p-10 border-8 border-black shadow-[20px_20px_0_0_rgba(0,0,0,1)] text-center w-full max-w-4xl max-h-screen overflow-y-auto animate-pop-in">
                        <h1 className="text-6xl font-black mb-8 uppercase tracking-tighter text-black drop-shadow-[4px_4px_0_rgba(255,255,100,1)]">
                            {en.levelUp}
                        </h1>
@@ -125,8 +138,9 @@ export const UIOverlay: React.FC = () => {
                            {currentLevelUpOptions.map((option) => (
                                <button 
                                    key={option.id}
-                                   onClick={() => endLevelUp(option.id)}
-                                   className={`${option.colorClass} border-8 border-black p-6 rounded-none text-left shadow-[8px_8px_0_0_rgba(0,0,0,1)] hover:translate-y-2 hover:translate-x-2 hover:shadow-none transition-all active:scale-95`}
+                                   disabled={isInputLocked}
+                                   onClick={() => !isInputLocked && endLevelUp(option.id)}
+                                   className={`${option.colorClass} border-8 border-black p-6 rounded-none text-left shadow-[8px_8px_0_0_rgba(0,0,0,1)] transition-all ${isInputLocked ? 'opacity-70 grayscale-[0.5]' : 'hover:translate-y-2 hover:translate-x-2 hover:shadow-none active:scale-95'}`}
                                >
                                    <div className="font-black text-2xl mb-3 uppercase tracking-tight">{option.name}</div>
                                    <div className="text-base font-bold opacity-90 whitespace-pre-line leading-tight">{option.description}</div>

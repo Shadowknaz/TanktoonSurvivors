@@ -2,9 +2,8 @@ node_modules/
 build/
 dist/
 coverage/
-docs/
-src/
 .DS_Store
 *.log
 .env*
 !.env.example
+.GIT_GUIDE.md
