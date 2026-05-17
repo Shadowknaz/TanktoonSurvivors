@@ -52,6 +52,8 @@ export enum ComicTextType {
   GODLIKE = 8,
   GOLD_RUSH = 9,
   WHOOSH = 10,
+  WAVE_START = 11,
+  TIER_UP = 12,
 }
 
 export enum AIState {

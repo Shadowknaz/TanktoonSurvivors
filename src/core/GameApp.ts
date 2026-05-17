@@ -6,13 +6,13 @@ import { createWorld, deleteWorld, World, query, hasComponent } from "bitecs";
 import { LevelManager } from "../services/LevelManager";
 import { SystemManager } from "../services/SystemManager";
 import { PoolManager } from "../services/PoolManager";
-import { useGameStore } from "../stores/GameStore";
+import { useGameStore, subscribeToWaveEvents } from "../stores/GameStore";
 import { GameContext } from "../models/GameContext";
 import { GameState as GameStateEnum } from "../models/types";
 import { GameState, Health } from "../ecs/components";
 import { EntityUtils } from "../utils/EntityUtils";
 import { GameConfig } from "../config/GameConfig";
-import { EventBus } from "./EventBus";
+import { globalEventBus } from "./EventBus";
 import { ResetLevelEvent } from "../models/events";
 
 export class GameApp {
@@ -22,7 +22,6 @@ export class GameApp {
   public inputViewModel: InputViewModel;
   /** Mutable — replaced in-place on soft-reset without re-creating the entire GameApp. */
   public world: World;
-  public eventBus: EventBus;
   private systemManager: SystemManager;
   private isDestroyed = false;
   private lastFpsTime = 0;
@@ -32,14 +31,15 @@ export class GameApp {
 
   constructor() {
     this.world = createWorld();
-    this.eventBus = new EventBus();
     this.pixiRenderer = new PixiRenderer();
     this.physicsEngine = new PhysicsEngine();
     this.inputViewModel = new InputViewModel();
-    this.systemManager = new SystemManager(this.eventBus);
+    this.systemManager = new SystemManager();
 
     useGameStore.getState().setInputViewModel(this.inputViewModel);
-    useGameStore.getState().setEventBus(this.eventBus);
+
+    // Subscribe to wave/score events for UI updates
+    subscribeToWaveEvents();
 
     this.sharedContext = {
          isGameOver: false,
@@ -73,7 +73,7 @@ export class GameApp {
     );
 
     // Soft-reset handler: swaps world in-place, preserving Pixi/Matter caches.
-    this.eventBus.subscribe(ResetLevelEvent, () => {
+    globalEventBus.subscribe(ResetLevelEvent, () => {
       if (this.isDestroyed) return;
       this.world = LevelManager.resetLevel(this.world, this.physicsEngine);
       // Re-warm physics pools with the live physicsEngine after reset
@@ -135,6 +135,15 @@ export class GameApp {
          useGameStore.getState().syncPlayerHealth(health.current, health.max);
      }
 
+     // Sync wave/score/time from ECS to Store
+     const gs = EntityUtils.getGameState(this.world);
+     if (gs) {
+         useGameStore.getState().setCurrentWave(GameState.currentWave[gs]);
+         useGameStore.getState().setCurrentTier(GameState.currentTier[gs]);
+         useGameStore.getState().setScore(GameState.score[gs]);
+         useGameStore.getState().setSurvivalTime(GameState.survivalTime[gs]);
+     }
+
      return this.sharedContext;
   }
 
@@ -179,14 +188,13 @@ export class GameApp {
   }
 
   destroy() {
+    if (this.isDestroyed) return;
     this.isDestroyed = true;
     this.gameLoop.stop();
     this.pixiRenderer.destroy();
     this.physicsEngine.destroy();
     this.inputViewModel.destroy();
     this.systemManager.destroy();
-    useGameStore.getState().setEventBus(null);
-    this.eventBus.clear();
     deleteWorld(this.world);
   }
 }

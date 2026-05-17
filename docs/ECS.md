@@ -30,15 +30,18 @@ export const PositionComponent = defineComponent({
 5. Создает твердое тело (RigidBody) в Matter.js.
 
 ### Системы (`systems/`)
-Это функции, которые принимают `world` и делают маппинг. 
+Это функции, которые принимают `world` и делают маппинг.
 Порядок вызова систем критически важен:
-1. `InputSystem` — Чтение команд управления.
-2. `AISystem` — Расчет паттернов поведения ботов.
-3. `WeaponSystem` — Расчет спавна пуль.
-4. `SpawnSystem` — Реальный спавн новых сущностей из пула.
-5. `PhysicsSyncSystem` — Синхронизация логики ECS с физическим движком.
-6. `CollisionSystem` — Обработка столкновений, нанесение урона.
-7. `RenderSystem` — Обновление позиций спрайтов и отправка на WebGL.
+1. `WaveSystem` — Прогрессия волн и тиров, таймер выживания.
+2. `UpgradeSystem` — Обработка улучшений игрока.
+3. `EventSystem` — Случайные события на карте (с учетом текущего тира).
+4. `SpawnSystem` — Реальный спавн новых сущностей из пула (фильтрация по тиру).
+5. `InputSystem` — Чтение команд управления.
+6. `AISystem` — Расчет паттернов поведения ботов.
+7. `WeaponSystem` — Расчет спавна пуль.
+8. `PhysicsSyncSystem` — Синхронизация логики ECS с физическим движком.
+9. `CollisionSystem` — Обработка столкновений, нанесение урона.
+10. `RenderSystem` — Обновление позиций спрайтов и отправка на WebGL.
 
 ## Синхронизация с Matter.js и Pixi.js
 
@@ -111,3 +114,59 @@ class PhysicsEngine {
 ## Локальные Set для AOE урона
 
 Статический `shrapnelProcessedSet` заменен на локальный `Set`, создаваемый при каждом вызове AOE урона. Это предотвращает накопление состояния между вызовами и упрощает логику.
+
+## Система Волн и Тиров (`WaveSystem`)
+
+Компонент `GameState` хранит прогрессию игры:
+- `currentWave` — текущая волна (начинается с 1)
+- `waveTimer` — таймер до следующей волны (60 секунд)
+- `currentTier` — текущий тир сложности (0-3)
+- `score` — очки игрока
+- `survivalTime` — время выживания в секундах
+
+### Прогрессия тиров
+
+Каждые 3 волны происходит повышение тира. Враги и события накапливаются кумулятивно:
+- **Тир 0**: Rammer, Shooter + Bomber, Loot
+- **Тир 1**: +Sniper, Kamikaze + Mines
+- **Тир 2**: +Tank, Grenadier + Artillery
+- **Тир 3**: +Sapper, Flamer + Swarm
+
+### Множители сложности
+
+Каждый тир применяет множители:
+- `spawnIntervalMult` — скорость спавна врагов
+- `enemyHealthMult` — здоровье врагов
+- `enemySpeedMult` — скорость врагов
+- `maxEnemies` — максимальное количество врагов
+- `scoreMultiplier` — бонус к очкам за убийство
+
+### Фильтрация спавна
+
+`SpawnSystem` и `EventSystem` читают `currentTier` из ECS и фильтруют доступных врагов/события через `WaveConfig.TIERS[tier].unlockedEnemies/Events`.
+
+## Схема PlayerStats и единый источник правды
+
+Компонент `PlayerStats` содержит десятки полей (скорость, урон, флаги синергий и т.д.). Чтобы предотвратить рассинхронизацию при добавлении новых статов, введён модуль `src/config/PlayerStatsDefaults.ts`.
+
+### Правило: один ключ — одно место
+
+- `PLAYER_STATS_DEFAULTS` — единый словарь всех базовых значений. Каждое значение ссылается на `GameConfig`, а не на литерал.
+- `PlayerStatKey` — union всех ключей, выводимый из `PLAYER_STATS_DEFAULTS`.
+- `StatsUtils.resetPlayerStats(eid)` итерирует по `PLAYER_STATS_DEFAULTS` вместо ручного перечисления полей.
+- `WeaponSystem` декларирует `WEAPON_STAT_KEYS` — подмножество `PlayerStatKey`, которое читает каждый кадр. При компиляции TypeScript проверяет, что все ключи валидны.
+
+### Как добавить новый stat
+
+1. Добавить поле в `PlayerStats` (`src/ecs/components/index.ts`).
+2. Добавить константу в `GameConfig` (например, `PLAYER_BASE_NEW_STAT: 0`).
+3. Добавить пару `newStat: GameConfig.PLAYER_BASE_NEW_STAT` в `PLAYER_STATS_DEFAULTS`.
+4. Если `WeaponSystem` использует новый stat — включить ключ в `WEAPON_STAT_KEYS`.
+
+### Compile-time guards
+
+`PlayerStatsDefaults.ts` содержит два type-level assertion:
+- **MissingKeys**: каждый ключ `PlayerStats` должен присутствовать в `PLAYER_STATS_DEFAULTS`.
+- **ExtraKeys**: в `PLAYER_STATS_DEFAULTS` не должно быть ключей, отсутствующих в `PlayerStats`.
+
+Если хотя бы один ключ не совпадает, сборка TypeScript упадёт с ошибкой. Это предотвращает класс бага, при котором новое поле забывали сбросить в `resetPlayerStats`.

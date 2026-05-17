@@ -7,6 +7,7 @@ import { en } from '../localization/en';
 import { MainMenu } from './MainMenu';
 import { DeviceUtils } from '../utils/DeviceUtils';
 import { ResetLevelEvent } from '../models/events';
+import { globalEventBus } from '../core/EventBus';
 
 // ─── Sub-selectors ──────────────────────────────────────────────────────────
 // Each selector subscribes only to the fields it actually renders.
@@ -27,7 +28,9 @@ const useStaticState = () =>
       acquiredUpgrades:     s.acquiredUpgrades,
       endLevelUp:           s.endLevelUp,
       goldRushTimeLeft:     s.goldRushTimeLeft,
-      eventBus:             s.eventBus,
+      currentWave:          s.currentWave,
+      currentTier:          s.currentTier,
+      score:                s.score,
     }))
   );
 
@@ -36,6 +39,42 @@ const useSpeedState = () => useGameStore((s) => s.currentSpeed);
 
 /** High-frequency: buff timer — can change every tick while a buff is active. */
 const useBuffState = () => useGameStore((s) => s.activeBuff);
+
+/** High-frequency: survival time — updated every tick. Isolated to avoid re-rendering entire HUD. */
+const useWaveState = () =>
+  useGameStore(
+    useShallow((s) => ({
+      currentWave: s.currentWave,
+      currentTier: s.currentTier,
+      score: s.score,
+      survivalTime: s.survivalTime,
+    }))
+  );
+
+// ─── Wave info — isolated sub-component for high-frequency wave data ─────────
+const WaveInfo: React.FC<{ isMobile: boolean }> = ({ isMobile }) => {
+  const { currentWave, currentTier, score, survivalTime } = useWaveState();
+  return (
+    <div className={`flex flex-col gap-1 ${isMobile ? 'scale-75' : ''}`}>
+      <div className="flex justify-between items-center bg-[#fdfbf7] border-4 border-black p-2 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+        <div className="flex items-center gap-3">
+          <span className="font-black text-black text-sm uppercase">
+            {en.wave} {currentWave}
+          </span>
+          <span className="font-black text-yellow-600 text-xs uppercase bg-yellow-100 px-2 py-0.5 border-2 border-black">
+            {en.tier} {currentTier + 1}
+          </span>
+        </div>
+        <span className="font-mono font-black text-black text-sm">
+          {Math.floor(survivalTime / 60).toString().padStart(2, '0')}:{Math.floor(survivalTime % 60).toString().padStart(2, '0')}
+        </span>
+      </div>
+      <div className="bg-black text-white font-mono font-black text-sm px-2 py-1 text-right">
+        {en.score}: {score.toLocaleString()}
+      </div>
+    </div>
+  );
+};
 
 // ─── FPS counter ────────────────────────────────────────────────────────────
 const FPSCounter: React.FC = () => {
@@ -106,7 +145,7 @@ export const UIOverlay: React.FC = () => {
   const {
     playerHealth, playerMaxHealth, playerExp, playerNextLevelExp, playerLevel,
     currentLevelUpOptions, acquiredUpgrades, endLevelUp,
-    gameState, goldRushTimeLeft, eventBus,
+    gameState, goldRushTimeLeft,
   } = useStaticState();
 
   const isMobile = DeviceUtils.isMobile();
@@ -126,10 +165,8 @@ export const UIOverlay: React.FC = () => {
   }, [isLevelingUp]);
 
   const handleTryAgain = useCallback(() => {
-    if (eventBus) {
-      eventBus.publish(new ResetLevelEvent());
-    }
-  }, [eventBus]);
+    globalEventBus.publish(new ResetLevelEvent());
+  }, []);
 
   const rawHealthPct = Math.max(0, (playerHealth / playerMaxHealth) * 100);
   const healthPct    = Math.ceil(rawHealthPct / 10) * 10;
@@ -171,6 +208,9 @@ export const UIOverlay: React.FC = () => {
         <div className="flex justify-between items-start w-full gap-4">
           {/* Left side stats */}
           <div className={`flex flex-col gap-3 w-full max-w-sm pointer-events-auto transform -skew-x-6 origin-top-left ${isMobile ? 'scale-75' : ''}`}>
+            {/* Wave/Tier/Score/Time display — isolated for performance */}
+            <WaveInfo isMobile={isMobile} />
+
             {/* Health bar */}
             <div className="w-full bg-[#fdfbf7] h-8 rounded-none border-4 border-black p-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] relative overflow-hidden">
               <div className="h-full bg-red-500 transition-none" style={{ width: `${healthPct}%` }} />

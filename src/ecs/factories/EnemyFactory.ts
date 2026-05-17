@@ -25,7 +25,9 @@ export class EnemyFactory {
     physicsEngine: PhysicsEngine,
     x: number,
     y: number,
-    template: EnemyTemplate
+    template: EnemyTemplate,
+    healthMult: number = 1.0,
+    speedMult: number = 1.0
   ): number {
     const eid = addEntity(world);
 
@@ -39,13 +41,13 @@ export class EnemyFactory {
     Velocity.y[eid] = 0;
 
     addComponent(world, eid, Health);
-    Health.max[eid] = template.health;
-    Health.current[eid] = template.health;
+    Health.max[eid] = template.health * healthMult;
+    Health.current[eid] = template.health * healthMult;
 
     addComponent(world, eid, AIBehavior);
     AIBehavior.state[eid] = 1; // 1 = SEEK/PATROL based on FSM now
     AIBehavior.targetEntity[eid] = 0;
-    AIBehavior.speedMult[eid] = template.speedModifier || 1.0;
+    AIBehavior.speedMult[eid] = (template.speedModifier || 1.0) * speedMult;
 
     addComponent(world, eid, TankTracks);
     TankTracks.lastX[eid] = x;

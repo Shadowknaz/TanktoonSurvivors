@@ -28,6 +28,7 @@ import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
 import { OwnerType, SpriteId } from "../../models/types";
 import { GameConfig } from "../../config/GameConfig";
+import { PLAYER_STATS_DEFAULTS, PlayerStatKey } from "../../config/PlayerStatsDefaults";
 import { PoolManager, PooledBody } from "../../services/PoolManager";
 import { EffectFactory } from "../factories/EffectFactory";
 import Matter from "matter-js";
@@ -35,80 +36,51 @@ import { GameContext } from "../../models/GameContext";
 import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
 
-/** Snapshot of per-frame shooter stats, read from ECS components into pre-allocated buffers to avoid GC pressure. */
-interface StatsSnapshot {
-  damage: number;
-  explosiveRadius: number;
-  pierceCount: number;
-  hasAutoGun: number;
-  multishotCount: number;
-  fireRateMultiplier: number;
-  hasAutoVolley: number;
-  projectileSizeMult: number;
-  knockbackForce: number;
-  chainCount: number;
-  hasSeismic: number;
-  hasStasis: number;
-  hasNapalmMinigun: number;
-}
+/** Keys from PlayerStats that WeaponSystem reads each frame. Must be kept in sync with copyStats. */
+const WEAPON_STAT_KEYS = [
+  'damage', 'explosiveRadius', 'pierceCount', 'hasAutoGun',
+  'multishotCount', 'fireRateMultiplier', 'hasAutoVolley',
+  'projectileSizeMult', 'knockbackForce', 'chainCount',
+  'hasSeismic', 'hasStasis', 'hasNapalmMinigun'
+] as const;
+
+type WeaponStatKey = typeof WEAPON_STAT_KEYS[number];
+type StatsSnapshot = Record<WeaponStatKey, number>;
+
+/** Compile-time guard: every WeaponStatKey must be a valid PlayerStatKey. */
+type _AssertWeaponKeysValid = {
+  [K in WeaponStatKey]: K extends PlayerStatKey ? true : never;
+}[WeaponStatKey];
+export const _weaponKeyCheck: _AssertWeaponKeysValid = true;
 
 export class WeaponSystem {
   private enemyIndex: EnemyIndex;
 
   constructor(enemyIndex: EnemyIndex) {
     this.enemyIndex = enemyIndex;
+    // Runtime validation: ensure all weapon stats exist in PlayerStats component
+    for (const key of WEAPON_STAT_KEYS) {
+      if (!(key in PlayerStats)) {
+        throw new Error(`WeaponSystem: PlayerStats missing expected key "${key}"`);
+      }
+    }
   }
 
-  private playerStatsBuffer: StatsSnapshot = {
-      damage: 0,
-      explosiveRadius: 0,
-      pierceCount: 0,
-      hasAutoGun: 0,
-      multishotCount: 0,
-      fireRateMultiplier: 1.0,
-      hasAutoVolley: 0,
-      projectileSizeMult: 0,
-      knockbackForce: 0,
-      chainCount: 0,
-      hasSeismic: 0,
-      hasStasis: 0,
-      hasNapalmMinigun: 0
-  };
+  private playerStatsBuffer: StatsSnapshot = WeaponSystem.createEmptyStatsSnapshot();
+  private enemyStatsBuffer: StatsSnapshot = WeaponSystem.createEmptyStatsSnapshot();
+  private autoStatsBuffer: StatsSnapshot = WeaponSystem.createEmptyStatsSnapshot();
 
-  private enemyStatsBuffer: StatsSnapshot = {
-      damage: 0,
-      explosiveRadius: 0,
-      pierceCount: 0,
-      hasAutoGun: 0,
-      multishotCount: 0,
-      fireRateMultiplier: 1.0,
-      hasAutoVolley: 0,
-      projectileSizeMult: 0,
-      knockbackForce: 0,
-      chainCount: 0,
-      hasSeismic: 0,
-      hasStasis: 0,
-      hasNapalmMinigun: 0
-  };
-
-  private autoStatsBuffer: StatsSnapshot = {
-      damage: 0,
-      explosiveRadius: 0,
-      pierceCount: 0,
-      hasAutoGun: 0,
-      multishotCount: 0,
-      fireRateMultiplier: 1.0,
-      hasAutoVolley: 0,
-      projectileSizeMult: 0,
-      knockbackForce: 0,
-      chainCount: 0,
-      hasSeismic: 0,
-      hasStasis: 0,
-      hasNapalmMinigun: 0
-  };
+  private static createEmptyStatsSnapshot(): StatsSnapshot {
+    const snap = {} as StatsSnapshot;
+    for (const key of WEAPON_STAT_KEYS) {
+      snap[key] = (PLAYER_STATS_DEFAULTS as Record<string, number>)[key] ?? 0;
+    }
+    return snap;
+  }
 
   private matterPosBuffer = { x: 0, y: 0 };
 
+  /** Hot-path: manual field copy to avoid GC. Must stay in sync with WEAPON_STAT_KEYS. */
   private copyStats(src: StatsSnapshot, dest: StatsSnapshot): void {
     dest.damage = src.damage;
     dest.explosiveRadius = src.explosiveRadius;

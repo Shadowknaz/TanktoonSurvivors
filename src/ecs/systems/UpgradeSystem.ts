@@ -10,7 +10,9 @@ export class UpgradeSystem {
     private unsubscribe: () => void;
 
     constructor(eventBus: EventBus) {
+        console.log('[UpgradeSystem] Constructor called, subscribing to UpgradesChangedEvent');
         this.unsubscribe = eventBus.subscribe(UpgradesChangedEvent, (event) => {
+            console.log('[UpgradeSystem] UpgradesChangedEvent received:', event);
             this.pendingEvent = event;
         });
     }
@@ -58,6 +60,10 @@ export class UpgradeSystem {
                                     let newVal = statArray[eid] + effect.value;
                                     if (effect.maxValue !== undefined) {
                                         newVal = Math.min(newVal, effect.maxValue);
+                                    }
+                                    // Ensure integer values for Uint8Array stats (multishotCount, pierceCount, chainCount, etc.)
+                                    if (statArray instanceof Uint8Array) {
+                                        newVal = Math.floor(newVal);
                                     }
                                     statArray[eid] = newVal;
                                 }

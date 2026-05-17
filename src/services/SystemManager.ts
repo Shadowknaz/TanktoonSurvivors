@@ -13,7 +13,8 @@ import { WeaponSystem } from "../ecs/systems/WeaponSystem";
 import { CollisionSystem } from "../ecs/systems/CollisionSystem";
 import { EventSystem } from "../ecs/systems/EventSystem";
 import { UpgradeSystem } from "../ecs/systems/UpgradeSystem";
-import { EventBus } from "../core/EventBus";
+import { WaveSystem } from "../ecs/systems/WaveSystem";
+import { globalEventBus } from "../core/EventBus";
 import { EnemyIndex } from "./EnemyIndex";
 
 export class SystemManager {
@@ -27,13 +28,15 @@ export class SystemManager {
   private collisionSystem: CollisionSystem;
   private eventSystem: EventSystem;
   private upgradeSystem: UpgradeSystem;
+  private waveSystem: WaveSystem;
 
-  constructor(eventBus: EventBus) {
-    this.aiSystem = new AISystem(this.enemyIndex);
+  constructor() {
+    this.aiSystem = new AISystem(this.enemyIndex, globalEventBus);
     this.weaponSystem = new WeaponSystem(this.enemyIndex);
-    this.collisionSystem = new CollisionSystem(this.enemyIndex);
-    this.eventSystem = new EventSystem(this.enemyIndex);
-    this.upgradeSystem = new UpgradeSystem(eventBus);
+    this.collisionSystem = new CollisionSystem(this.enemyIndex, globalEventBus);
+    this.eventSystem = new EventSystem(this.enemyIndex, globalEventBus);
+    this.upgradeSystem = new UpgradeSystem(globalEventBus);
+    this.waveSystem = new WaveSystem(globalEventBus);
   }
 
   destroy() {
@@ -43,10 +46,13 @@ export class SystemManager {
   update(world: World, physicsEngine: PhysicsEngine, inputViewModel: InputViewModel, pixiRenderer: PixiRenderer, deltaTime: number, context: GameContext, alpha: number) {
     const isPaused = context.isLevelingUp || context.isGameOver || context.isMenu;
 
+    // UpgradeSystem must run even when paused to apply upgrades immediately after selection
+    this.upgradeSystem.update(world);
+
     if (!isPaused) {
       this.enemyIndex.update(world);
 
-      this.upgradeSystem.update(world);
+      this.waveSystem.update(world, deltaTime);
       this.eventSystem.update(world, physicsEngine, deltaTime, context);
       this.spawnSystem.update(world, physicsEngine, deltaTime, context);
       this.inputSystem.update(world, inputViewModel.getState(), deltaTime, context);

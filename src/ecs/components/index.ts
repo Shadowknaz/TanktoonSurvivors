@@ -210,6 +210,11 @@ export const GameState = defineComponent({
   spawnTimer: Types.f32,
   gameTime: Types.f32,
   timeScale: Types.f32,
+  currentWave: Types.ui32,
+  waveTimer: Types.f32,
+  currentTier: Types.ui32,
+  score: Types.ui32,
+  survivalTime: Types.f32,
 });
 
 export const MapBounds = defineComponent({

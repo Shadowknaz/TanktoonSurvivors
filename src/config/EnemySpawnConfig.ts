@@ -19,46 +19,60 @@ export const RarityWeights: Record<EnemyRarityTag, number> = {
 
 export interface EnemySpawnRule {
     tag: EnemyRarityTag;
-    spawnFn: (world: World, physicsEngine: PhysicsEngine, x: number, y: number) => void;
+    enemyType: EnemyType;
+    spawnFn: (world: World, physicsEngine: PhysicsEngine, x: number, y: number, healthMult: number, speedMult: number) => void;
 }
 
 export const ENEMY_SPAWN_RULES: EnemySpawnRule[] = [
     {
         tag: EnemyRarityTag.COMMON,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.RAMMER]),
+        enemyType: EnemyType.RAMMER,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.RAMMER], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.UNCOMMON,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.SHOOTER]),
+        enemyType: EnemyType.SHOOTER,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.SHOOTER], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.RARE,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.SNIPER]),
+        enemyType: EnemyType.SNIPER,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.SNIPER], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.RARE,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.KAMIKAZE]),
+        enemyType: EnemyType.KAMIKAZE,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.KAMIKAZE], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.EPIC,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.TANK]),
+        enemyType: EnemyType.TANK,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.TANK], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.UNCOMMON,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.GRENADIER]),
+        enemyType: EnemyType.GRENADIER,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.GRENADIER], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.UNCOMMON,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.SAPPER]),
+        enemyType: EnemyType.SAPPER,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.SAPPER], healthMult, speedMult),
     },
     {
         tag: EnemyRarityTag.EPIC,
-        spawnFn: (world, physics, x, y) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.FLAMER]),
+        enemyType: EnemyType.FLAMER,
+        spawnFn: (world, physics, x, y, healthMult, speedMult) => EnemyFactory.createEnemy(world, physics, x, y, ENEMY_TEMPLATES[EnemyType.FLAMER], healthMult, speedMult),
     },
 ];
 
+export interface WeightedSpawnEntry {
+    item: EnemySpawnRule;
+    weight: number;
+}
+
 // Helper array for RandomUtils.randomWeightedChoice
-export const ENEMY_SPAWN_POOL = ENEMY_SPAWN_RULES.map(rule => ({
+export const ENEMY_SPAWN_POOL: WeightedSpawnEntry[] = ENEMY_SPAWN_RULES.map(rule => ({
     item: rule,
     weight: RarityWeights[rule.tag]
 }));

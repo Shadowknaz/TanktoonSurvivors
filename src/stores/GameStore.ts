@@ -4,8 +4,8 @@ import { RandomUtils } from "../utils/RandomUtils";
 import { GameState } from "../models/types";
 import { InputViewModel } from "../viewmodels/InputViewModel";
 import { UpgradeUtils } from "../utils/UpgradeUtils";
-import { EventBus } from "../core/EventBus";
-import { UpgradesChangedEvent } from "../models/events";
+import { globalEventBus } from "../core/EventBus";
+import { UpgradesChangedEvent, WaveChangedEvent, ScoreChangedEvent } from "../models/events";
 
 export interface PerkEffect {
   type: "damage" | "health" | "speed" | "fireRate" | "other";
@@ -38,6 +38,7 @@ interface GameStore {
   score: number;
   survivalTime: number;
   currentWave: number;
+  currentTier: number;
   weaponLevel: number;
   availablePerks: Perk[];
   selectedPerks: Perk[];
@@ -60,7 +61,6 @@ interface GameStore {
   timeScaleDuration: number;
   // playerStats removed, managed by ECS PlayerStats component
   inputViewModel: InputViewModel | null;
-  eventBus: EventBus | null;
 
   // Derived getters
   isGameOver: () => boolean;
@@ -72,8 +72,12 @@ interface GameStore {
   updateGoldRushTimeLeft: (dt: number) => void;
   incrementTotalKills: () => void;
   addScore: (points: number) => void;
+  setScore: (score: number) => void;
   incrementSurvivalTime: (deltaTime: number) => void;
+  setSurvivalTime: (time: number) => void;
   nextWave: () => void;
+  setCurrentWave: (wave: number) => void;
+  setCurrentTier: (tier: number) => void;
   selectPerk: (perk: Perk) => void;
   upgradeWeapon: () => void;
   resetSession: () => void;
@@ -88,7 +92,6 @@ interface GameStore {
   setFps: (fps: number) => void;
   setInputViewModel: (input: InputViewModel) => void;
   addItemToInventory: (itemId: string, amount?: number) => void;
-  setEventBus: (eventBus: EventBus | null) => void;
   syncPlayerHealth: (health: number, maxHealth: number) => void;
 }
 
@@ -97,6 +100,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   score: 0,
   survivalTime: 0,
   currentWave: 1,
+  currentTier: 0,
   weaponLevel: 1,
   availablePerks: [],
   selectedPerks: [],
@@ -123,7 +127,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   timeScaleDuration: 0,
   // playerStats removed
   inputViewModel: null,
-  eventBus: null,
 
   isGameOver: () => get().gameState === GameState.GAME_OVER,
   isLevelingUp: () => get().gameState === GameState.LEVEL_UP,
@@ -138,22 +141,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
   incrementTotalKills: () => set((state) => ({ totalKills: state.totalKills + 1 })),
 
   addScore: (points) => set((state) => ({ score: state.score + points })),
+  setScore: (score) => set(() => ({ score })),
   incrementSurvivalTime: (dt) =>
     set((state) => ({ survivalTime: state.survivalTime + dt })),
+  setSurvivalTime: (time) => set(() => ({ survivalTime: time })),
   nextWave: () => set((state) => ({ currentWave: state.currentWave + 1 })),
+  setCurrentWave: (wave) => set(() => ({ currentWave: wave })),
+  setCurrentTier: (tier) => set(() => ({ currentTier: tier })),
   selectPerk: (perk) =>
     set((state) => ({ selectedPerks: [...state.selectedPerks, perk] })),
   upgradeWeapon: () => set((state) => ({ weaponLevel: state.weaponLevel + 1 })),
   resetSession: () => set(() => {
-      const eventBus = get().eventBus;
-      if (eventBus) {
-          eventBus.publish(new UpgradesChangedEvent([], []));
-      }
+      globalEventBus.publish(new UpgradesChangedEvent([], []));
       return {
           gameState: GameState.PLAYING,
           score: 0,
           survivalTime: 0,
           currentWave: 1,
+          currentTier: 0,
           weaponLevel: 1,
           selectedPerks: [],
           cameraShake: 0,
@@ -256,12 +261,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
           acquiredUpgrades: updatedAcquired,
           inventory: updatedInventory,
       };
-      
-      const eventBus = get().eventBus;
-      if (eventBus) {
-          eventBus.publish(new UpgradesChangedEvent(updatedAcquired, updatedInventory));
-      }
-      
+
+      console.log('[GameStore] endLevelUp called, publishing via globalEventBus');
+      const event = new UpgradesChangedEvent(updatedAcquired, updatedInventory);
+      console.log('[GameStore] Publishing UpgradesChangedEvent, acquired count:', updatedAcquired.length);
+      globalEventBus.publish(event);
+
       return newState;
   }),
   addItemToInventory: (itemId, amount = 1) => set((state) => {
@@ -275,14 +280,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
       } else {
           newInventory = [...state.inventory, { id: itemId, name: itemId, quantity: amount }];
       }
-      
-      const eventBus = get().eventBus;
-      if (eventBus) {
-          eventBus.publish(new UpgradesChangedEvent(state.acquiredUpgrades, newInventory));
-      }
-      
+
+      globalEventBus.publish(new UpgradesChangedEvent(state.acquiredUpgrades, newInventory));
+
       return { inventory: newInventory };
   }),
-  setInputViewModel: (inputViewModel) => set({ inputViewModel }),
-  setEventBus: (eventBus) => set({ eventBus })
+  setInputViewModel: (inputViewModel) => set({ inputViewModel })
 }));
+
+// Subscribe to wave and score events
+export function subscribeToWaveEvents() {
+  const unsubWave = globalEventBus.subscribe(WaveChangedEvent, (event) => {
+    useGameStore.getState().setCurrentWave(event.wave);
+    useGameStore.getState().setCurrentTier(event.tier);
+  });
+
+  const unsubScore = globalEventBus.subscribe(ScoreChangedEvent, (event) => {
+    useGameStore.getState().setScore(event.score);
+  });
+
+  return () => {
+    unsubWave();
+    unsubScore();
+  };
+}

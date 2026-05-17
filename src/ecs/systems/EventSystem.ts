@@ -1,5 +1,5 @@
 import {  addEntity, addComponent, query, removeEntity, hasComponent, removeComponent, World } from "bitecs";
-import { Position, WarningMarker, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating } from "../components";
+import { Position, WarningMarker, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating, GameState } from "../components";
 import { SpriteId, ComicTextType } from "../../models/types";
 import { EventConfig } from "../../config/EventConfig";
 import { MathUtils } from "../../utils/MathUtils";
@@ -15,12 +15,16 @@ import { CollisionSystem } from "./CollisionSystem";
 import { GameContext } from "../../models/GameContext";
 import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
+import { getCurrentTier, GameEventType } from "../../config/WaveConfig";
+import { EventBus } from "../../core/EventBus";
 
 export class EventSystem {
   private nextEventFrames: number = 0;
   private artilleryQueue: {x: number, y: number, countdown: number}[] = [];
+  private eventBus: EventBus;
 
-  constructor(_enemyIndex: EnemyIndex) {
+  constructor(_enemyIndex: EnemyIndex, eventBus: EventBus) {
+    this.eventBus = eventBus;
     this.scheduleNextEvent();
   }
 
@@ -58,7 +62,7 @@ export class EventSystem {
         if (Detonating.timer[eid] <= 0) {
             removeComponent(world, eid, Health);
             if (hasComponent(world, eid, Explosive)) {
-               CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], Explosive.radius[eid], ContactDamage.value[eid] || 30, 0, context);
+               CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], Explosive.radius[eid], ContactDamage.value[eid] || 30, 0, context, this.eventBus);
                EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid], ComicTextType.BOOM);
             }
             CollisionSystem.destroyEntityStatic(world, physicsEngine, eid);
@@ -94,7 +98,7 @@ export class EventSystem {
         const radius = type === 0 ? EventConfig.BOMBER_RADIUS : EventConfig.ARTILLERY_RADIUS;
         const damage = type === 0 ? EventConfig.BOMBER_DAMAGE : EventConfig.ARTILLERY_DAMAGE;
 
-        CollisionSystem.applyAOEDamage(world, physicsEngine, x, y, radius, damage, 0, context); // 0 = env
+        CollisionSystem.applyAOEDamage(world, physicsEngine, x, y, radius, damage, 0, context, this.eventBus); // 0 = env
         
         EffectFactory.spawnComicEffect(world, x, y, 4); // BOOM effect
         removeEntity(world, eid);
@@ -105,20 +109,31 @@ export class EventSystem {
   private triggerRandomEvent(world: World, physicsEngine: PhysicsEngine, px: number, py: number, context: GameContext) {
     if (context.totalKills > 100 && RandomUtils.random() < 0.1 && context.goldRushTimeLeft <= 0) {
       context.triggerGoldRush(30);
-      EffectFactory.spawnComicEffect(world, px, py - 60, ComicTextType.GOLD_RUSH); 
+      EffectFactory.spawnComicEffect(world, px, py - 60, ComicTextType.GOLD_RUSH);
       return;
     }
 
-    const eventType = Math.floor(RandomUtils.random() * 5); // 0 to 4
-    
+    // Get current tier and filter available events
+    const gs = EntityUtils.getGameState(world);
+    if (!gs) return;
+
+    const currentWave = GameState.currentWave[gs];
+    const tier = getCurrentTier(currentWave);
+
+    // Filter to only unlocked events for this tier
+    const availableEvents = tier.unlockedEvents;
+    if (availableEvents.length === 0) return;
+
+    const eventType = availableEvents[Math.floor(RandomUtils.random() * availableEvents.length)];
+
     switch (eventType) {
-      case 0: // Bomber
+      case GameEventType.BOMBER: // Bomber
         const offsetBx = (RandomUtils.random() - 0.5) * 300;
         const offsetBy = (RandomUtils.random() - 0.5) * 300;
         const bPos = MapUtils.clampToMapBounds(px + offsetBx, py + offsetBy, 50);
         this.spawnWarningMarker(world, bPos.x, bPos.y, EventConfig.BOMBER_RADIUS, EventConfig.BOMBER_WARNING_FRAMES, 0);
         break;
-      case 1: // Artillery
+      case GameEventType.ARTILLERY: // Artillery
         for (let i = 0; i < EventConfig.ARTILLERY_COUNT; i++) {
           const offsetX = (RandomUtils.random() - 0.5) * 400;
           const offsetY = (RandomUtils.random() - 0.5) * 400;
@@ -130,16 +145,16 @@ export class EventSystem {
           });
         }
         break;
-      case 2: // Loot Drop
+      case GameEventType.LOOT: // Loot Drop
         const offsetX = (RandomUtils.random() - 0.5) * 300;
         const offsetY = (RandomUtils.random() - 0.5) * 300;
         const lPos = MapUtils.clampToMapBounds(px + offsetX, py + offsetY, 50);
         this.spawnWarningMarker(world, lPos.x, lPos.y, EventConfig.LOOT_RADIUS, 240, 2);
         break;
-      case 3: // Cluster Mines
+      case GameEventType.MINES: // Cluster Mines
         this.spawnClusterMines(world, physicsEngine, px, py);
         break;
-      case 4: // Swarm
+      case GameEventType.SWARM: // Swarm
         this.spawnSwarm(world, physicsEngine, px, py);
         break;
     }

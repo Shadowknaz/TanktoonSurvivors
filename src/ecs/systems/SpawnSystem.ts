@@ -4,9 +4,9 @@ import { Position, AIBehavior, GameState } from "../components";
 import { MapUtils } from "../../utils/MapUtils";
 import { GameConfig } from "../../config/GameConfig";
 import { RandomUtils } from "../../utils/RandomUtils";
-import { ENEMY_SPAWN_POOL } from "../../config/EnemySpawnConfig";
 import { GameContext } from "../../models/GameContext";
 import { EntityUtils } from "../../utils/EntityUtils";
+import { getCurrentTier, getTierSpawnPool } from "../../config/WaveConfig";
 
 export class SpawnSystem {
   update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, context: GameContext) {
@@ -17,11 +17,15 @@ export class SpawnSystem {
 
     // Check maximum enemies to prevent lag
     const enemies = query(world, [AIBehavior]);
-    const maxEnemies = context.goldRushTimeLeft > 0 ? 150 : 80;
+
+    // Get current tier for difficulty scaling
+    const currentWave = GameState.currentWave[gs];
+    const tier = getCurrentTier(currentWave);
+    const maxEnemies = context.goldRushTimeLeft > 0 ? 150 : tier.maxEnemies;
 
     if (GameState.spawnTimer[gs] <= 0) {
       const isGoldRush = context.goldRushTimeLeft > 0;
-      let interval = GameConfig.ENEMY_SPAWN_INTERVAL_MS / 1000;
+      let interval = (GameConfig.ENEMY_SPAWN_INTERVAL_MS / 1000) * tier.spawnIntervalMult;
       
       // Director System: Speed up spawn if player kills quickly
       const killStreak = GameState.killStreak[gs];
@@ -82,8 +86,13 @@ export class SpawnSystem {
 
       if (!posFound) return; // skip spawn if couldn't find a spot
 
-      const selectedEnemy = RandomUtils.randomWeightedChoice(ENEMY_SPAWN_POOL);
-      selectedEnemy.spawnFn(world, physicsEngine, spawnX, spawnY);
+      // Use pre-computed tier spawn pool (no .filter() in hot path)
+      const activePool = getTierSpawnPool(tier.tierIndex);
+
+      if (activePool.length === 0) return; // No enemies available
+
+      const selectedEnemy = RandomUtils.randomWeightedChoice(activePool);
+      selectedEnemy.spawnFn(world, physicsEngine, spawnX, spawnY, tier.enemyHealthMult, tier.enemySpeedMult);
     }
   }
 }

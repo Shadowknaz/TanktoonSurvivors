@@ -32,6 +32,7 @@ import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
+import { EventBus } from "../../core/EventBus";
 
 export class AISystem {
   private enemyIndex: EnemyIndex;
@@ -42,9 +43,11 @@ export class AISystem {
   private sepResult = { x: 0, y: 0 };
   private avoidResult = { x: 0, y: 0 };
   private moveResult = { x: 0, y: 0 };
+  private eventBus: EventBus;
 
-  constructor(enemyIndex: EnemyIndex) {
+  constructor(enemyIndex: EnemyIndex, eventBus: EventBus) {
     this.enemyIndex = enemyIndex;
+    this.eventBus = eventBus;
     this.obstacleGrid = new SpatialGrid(GameConfig.MAP_WIDTH, GameConfig.MAP_HEIGHT, GameConfig.AI_SPATIAL_GRID_OBSTACLE_CELL);
   }
 
@@ -114,7 +117,7 @@ export class AISystem {
     for (let i = 0; i < fireZones.length; i++) {
         const eid = fireZones[i];
         if (gameTime - FireZone.lastTick[eid] > FireZone.tickRate[eid]) {
-            CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], 50, FireZone.tickDamage[eid], 0, context);
+            CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], 50, FireZone.tickDamage[eid], 0, context, this.eventBus);
             FireZone.lastTick[eid] = gameTime;
         }
     }

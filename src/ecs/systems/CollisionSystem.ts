@@ -24,6 +24,9 @@ import {
   PlayerStats,
   Chain
 } from "../components";
+import { WaveConfig, getCurrentTier } from "../../config/WaveConfig";
+import { EventBus } from "../../core/EventBus";
+import { ScoreChangedEvent } from "../../models/events";
 import { 
   removeEntity,
   hasComponent,
@@ -54,12 +57,14 @@ const KILL_STREAK_THRESHOLDS: KillStreakThreshold[] = [
 
 export class CollisionSystem {
   private enemyIndex: EnemyIndex;
+  private eventBus: EventBus;
 
-  constructor(enemyIndex: EnemyIndex) {
+  constructor(enemyIndex: EnemyIndex, eventBus: EventBus) {
     this.enemyIndex = enemyIndex;
+    this.eventBus = eventBus;
   }
 
-  static handleEnemyKill(world: World, context: GameContext, x: number, y: number, ownerType: OwnerType) {
+  private static handleEnemyKill(world: World, context: GameContext, x: number, y: number, ownerType: OwnerType, eventBus: EventBus) {
     let xpMultiplier = 1;
 
     const gs = EntityUtils.getGameState(world);
@@ -74,6 +79,18 @@ export class CollisionSystem {
 
     context.incrementTotalKills();
 
+    // Calculate score with tier multiplier
+    if (ownerType === OwnerType.PLAYER) {
+      const currentWave = GameState.currentWave[gs];
+      const tier = getCurrentTier(currentWave);
+      const scoreGain = Math.ceil(WaveConfig.BASE_SCORE_PER_KILL * tier.scoreMultiplier);
+      GameState.score[gs] += scoreGain;
+
+      if (eventBus) {
+        eventBus.publish(new ScoreChangedEvent(GameState.score[gs]));
+      }
+    }
+
     if (context.goldRushTimeLeft > 0) {
       xpMultiplier *= 5;
     }
@@ -81,7 +98,7 @@ export class CollisionSystem {
     if (ownerType === OwnerType.PLAYER && gs !== undefined) {
       GameState.killStreak[gs]++;
       GameState.killStreakTimer[gs] = GameConfig.KILL_STREAK_DECAY_TIME;
-      
+
       xpMultiplier *= (1 + GameState.killStreak[gs] * 0.05);
 
       let matchedThreshold: KillStreakThreshold | null = null;
@@ -102,7 +119,7 @@ export class CollisionSystem {
     context.addExp(Math.ceil(GameConfig.ENEMY_XP_REWARD * xpMultiplier));
   }
 
-  static applyAOEDamage(world: World, physicsEngine: PhysicsEngine, cx: number, cy: number, radius: number, damage: number, ownerType: OwnerType, context: GameContext, processed: Set<number> = new Set<number>(), isShrapnel: boolean = false) {
+  static applyAOEDamage(world: World, physicsEngine: PhysicsEngine, cx: number, cy: number, radius: number, damage: number, ownerType: OwnerType, context: GameContext, eventBus: EventBus, processed: Set<number> = new Set<number>(), isShrapnel: boolean = false) {
     const bounds = {
       min: { x: cx - radius, y: cy - radius },
       max: { x: cx + radius, y: cy + radius }
@@ -187,7 +204,7 @@ export class CollisionSystem {
                             EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 40, ComicTextType.BAM);
                             if (PlayerStats.hasShrapnel[playerEid] && !isShrapnel) {
                                 const shrapnelSet = new Set<number>();
-                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, shrapnelSet, true);
+                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, eventBus, shrapnelSet, true);
                             }
                         }
 
@@ -232,10 +249,10 @@ export class CollisionSystem {
                             context.setGameOver(true);
                         } else if (isEidEnemy) {
                             if (ownerType === OwnerType.PLAYER) {
-                                CollisionSystem.handleEnemyKill(world, context, Position.x[eid], Position.y[eid], ownerType);
+                                CollisionSystem.handleEnemyKill(world, context, Position.x[eid], Position.y[eid], ownerType, eventBus);
                             }
                             if (hasComponent(world, eid, FlamerTank)) {
-                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], 100, 50, OwnerType.ENEMY, context, processed);
+                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], 100, 50, OwnerType.ENEMY, context, eventBus, processed);
                                 EffectFactory.spawnExplosion(world, Position.x[eid], Position.y[eid], 100);
                             }
                             CollisionSystem.destroyEntityStatic(world, physicsEngine, eid);
@@ -483,7 +500,7 @@ export class CollisionSystem {
                     EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 40, ComicTextType.BAM); // Visual feedback for crit
                     if (PlayerStats.hasShrapnel[playerEid]) {
                         const shrapnelSet = new Set<number>();
-                        CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[targetEid], Position.y[targetEid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, shrapnelSet, true);
+                        CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[targetEid], Position.y[targetEid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, this.eventBus, shrapnelSet, true);
                     }
                 }
 
@@ -529,7 +546,7 @@ export class CollisionSystem {
                 if (isTargetPlayer) {
                     context.setGameOver(true);
                 } else if (ownerType === OwnerType.PLAYER && isTargetEnemy) {
-                    CollisionSystem.handleEnemyKill(world, context, Position.x[targetEid], Position.y[targetEid], ownerType);
+                    CollisionSystem.handleEnemyKill(world, context, Position.x[targetEid], Position.y[targetEid], ownerType, this.eventBus);
                 }
                 this.destroyEntity(world, physicsEngine, targetEid);
             }
@@ -542,7 +559,7 @@ export class CollisionSystem {
             const px = Position.x[sourceEid];
             const py = Position.y[sourceEid];
             
-            CollisionSystem.applyAOEDamage(world, physicsEngine, px, py, radius, damage, ownerType, context);
+            CollisionSystem.applyAOEDamage(world, physicsEngine, px, py, radius, damage, ownerType, context, this.eventBus);
 
             const blastText = hasComponent(world, sourceEid, Kamikaze) ? ComicTextType.BOOM : ComicTextType.POW;
             EffectFactory.spawnComicEffect(world, px, py, blastText);

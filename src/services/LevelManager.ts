@@ -2,6 +2,7 @@ import { World, addEntity, addComponent, deleteWorld, createWorld } from "bitecs
 import { PhysicsEngine } from "./PhysicsEngine";
 import { MapGenerator } from "../utils/MapGenerator";
 import { GameConfig } from "../config/GameConfig";
+import { WaveConfig } from "../config/WaveConfig";
 import { EnvironmentFactory } from "../ecs/factories/EnvironmentFactory";
 import { PlayerFactory } from "../ecs/factories/PlayerFactory";
 import { GameState, MapBounds } from "../ecs/components";
@@ -18,6 +19,11 @@ export class LevelManager {
     GameState.spawnTimer[globalEntity] = 0;
     GameState.timeScale[globalEntity] = 1.0;
     GameState.gameTime[globalEntity] = 0;
+    GameState.currentWave[globalEntity] = 1;
+    GameState.waveTimer[globalEntity] = WaveConfig.WAVE_DURATION_SEC;
+    GameState.currentTier[globalEntity] = 0;
+    GameState.score[globalEntity] = 0;
+    GameState.survivalTime[globalEntity] = 0;
 
     const envProps = MapGenerator.generate(GameConfig.MAP_WIDTH, GameConfig.MAP_HEIGHT);
     for (const p of envProps) {

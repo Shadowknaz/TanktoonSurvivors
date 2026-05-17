@@ -21,7 +21,7 @@ export default function App() {
     app
       .init(containerRef.current)
       .then(() => {
-        if (isDestroyed) {
+        if (isDestroyed && gameAppRef.current === app) {
           app.destroy();
         }
       })
@@ -29,7 +29,9 @@ export default function App() {
 
     return () => {
       isDestroyed = true;
-      app.destroy();
+      if (gameAppRef.current === app) {
+        app.destroy();
+      }
     };
   }, []);
 
