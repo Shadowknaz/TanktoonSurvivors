@@ -14,7 +14,6 @@ import {
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { GameConfig } from "../../config/GameConfig";
 import { CollisionCategory } from "../../config/PhysicsConfig";
-import { useGameStore } from "../../stores/GameStore";
 import { SpriteId } from "../../models/types";
 import { StatsUtils } from "../../utils/StatsUtils";
 
@@ -39,9 +38,6 @@ export class PlayerFactory {
     addComponent(worldInstance, eid, Health);
     Health.max[eid] = GameConfig.PLAYER_MAX_HEALTH;
     Health.current[eid] = GameConfig.PLAYER_MAX_HEALTH;
-
-    // Reset player health in store
-    useGameStore.getState().setPlayerHealth(GameConfig.PLAYER_MAX_HEALTH, GameConfig.PLAYER_MAX_HEALTH);
 
     addComponent(worldInstance, eid, PlayerControlled);
     PlayerControlled.active[eid] = 1;

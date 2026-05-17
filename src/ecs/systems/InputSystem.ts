@@ -1,5 +1,12 @@
-import {  query, hasComponent, World } from "bitecs";
-import { PlayerControlled, Position, Velocity, Weapon, Health, PlayerBuffs, PlayerStats } from "../components";
+import { query, World } from "bitecs";
+import {
+  Position,
+  Velocity,
+  PlayerControlled,
+  PlayerBuffs,
+  PlayerStats,
+  Weapon
+} from "../components";
 import { InputState } from "../../viewmodels/InputViewModel";
 import { GameConfig } from "../../config/GameConfig";
 import { MathUtils } from "../../utils/MathUtils";
@@ -86,13 +93,6 @@ export class InputSystem {
       
       if (PlayerBuffs.adrenalineTimer[eid] > 0) {
         baseSpeed *= GameConfig.SYNERGY_ADRENALINE_SPEED_MULT;
-      }
-      
-      // Send health state back to store for UI
-      if (hasComponent(world, eid, Health)) {
-        if (Health.current[eid] !== context.playerHealth || Health.max[eid] !== context.playerMaxHealth) {
-            context.setPlayerHealth(Health.current[eid], Health.max[eid]);
-        }
       }
       
       const isMoving = moveX !== 0 || moveY !== 0;

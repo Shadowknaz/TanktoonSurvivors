@@ -78,3 +78,6 @@ export interface BBox {
   maxX: number;
   maxY: number;
 }
+
+/** Branded type for ECS entity IDs to prevent accidental undefined access. */
+export type EntityId = number & { readonly __entityId: unique symbol };

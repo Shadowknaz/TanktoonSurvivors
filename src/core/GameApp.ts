@@ -2,14 +2,15 @@ import { PixiRenderer } from "../views/renderers/PixiRenderer";
 import { GameLoop } from "./GameLoop";
 import { PhysicsEngine } from "../services/PhysicsEngine";
 import { InputViewModel } from "../viewmodels/InputViewModel";
-import { createWorld, deleteWorld, World, query } from "bitecs";
+import { createWorld, deleteWorld, World, query, hasComponent } from "bitecs";
 import { LevelManager } from "../services/LevelManager";
 import { SystemManager } from "../services/SystemManager";
 import { PoolManager } from "../services/PoolManager";
 import { useGameStore } from "../stores/GameStore";
 import { GameContext } from "../models/GameContext";
 import { GameState as GameStateEnum } from "../models/types";
-import { GameState } from "../ecs/components";
+import { GameState, Health } from "../ecs/components";
+import { EntityUtils } from "../utils/EntityUtils";
 import { GameConfig } from "../config/GameConfig";
 import { EventBus } from "./EventBus";
 import { ResetLevelEvent } from "../models/events";
@@ -46,15 +47,12 @@ export class GameApp {
          isMenu: false,
          cameraShake: 0,
          screenShakeEnabled: true,
-         playerHealth: 100,
-         playerMaxHealth: 100,
          currentSpeed: 0,
          activeBuff: null,
          goldRushTimeLeft: 0,
          totalKills: 0,
          timeScale: 1.0,
 
-         setPlayerHealth: (h, m) => useGameStore.getState().setPlayerHealth(h, m),
          setGameOver: (stateBool) => useGameStore.getState().setGameState(stateBool ? GameStateEnum.GAME_OVER : GameStateEnum.PLAYING),
          triggerGoldRush: (dur) => useGameStore.getState().triggerGoldRush(dur),
          updateGoldRushTimeLeft: (dt) => useGameStore.getState().updateGoldRushTimeLeft(dt),
@@ -64,7 +62,8 @@ export class GameApp {
          setCameraShake: (amt) => useGameStore.getState().setCameraShake(amt),
          setCurrentSpeed: (spd) => useGameStore.getState().setCurrentSpeed(spd),
          setActiveBuff: (bf) => useGameStore.getState().setActiveBuff(bf),
-         setTimeScale: (sc, dur) => useGameStore.getState().setTimeScale(sc, dur)
+         setTimeScale: (sc, dur) => useGameStore.getState().setTimeScale(sc, dur),
+         getPlayerHealth: () => this.getPlayerHealth()
     };
 
     this.gameLoop = new GameLoop(
@@ -120,18 +119,33 @@ export class GameApp {
   private getGameContext(): GameContext {
      const state = useGameStore.getState();
      this.sharedContext.isGameOver = state.isGameOver();
-     this.sharedContext.isLevelingUp = state.isLevelingUp();
-     this.sharedContext.isMenu = state.gameState === GameStateEnum.MENU;
-     this.sharedContext.cameraShake = state.cameraShake;
-     this.sharedContext.screenShakeEnabled = state.settings.screenShake;
-     this.sharedContext.playerHealth = state.playerHealth;
-     this.sharedContext.playerMaxHealth = state.playerMaxHealth;
-     this.sharedContext.currentSpeed = state.currentSpeed;
+    this.sharedContext.isLevelingUp = state.isLevelingUp();
+    this.sharedContext.isMenu = state.gameState === GameStateEnum.MENU;
+    this.sharedContext.cameraShake = state.cameraShake;
+    this.sharedContext.screenShakeEnabled = state.settings.screenShake;
+    this.sharedContext.currentSpeed = state.currentSpeed;
      this.sharedContext.activeBuff = state.activeBuff;
      this.sharedContext.goldRushTimeLeft = state.goldRushTimeLeft;
      this.sharedContext.totalKills = state.totalKills;
      this.sharedContext.timeScale = state.timeScale;
+
+     // Sync health from ECS to Store (single source of truth: ECS)
+     const health = this.getPlayerHealth();
+     if (health) {
+         useGameStore.getState().syncPlayerHealth(health.current, health.max);
+     }
+
      return this.sharedContext;
+  }
+
+  private getPlayerHealth(): { current: number; max: number } | null {
+    const playerEid = EntityUtils.getFirstPlayer(this.world);
+    if (!playerEid) return null;
+    if (!hasComponent(this.world, playerEid, Health)) return null;
+    return {
+      current: Health.current[playerEid],
+      max: Health.max[playerEid]
+    };
   }
 
   private update(deltaTime: number) {

@@ -43,9 +43,9 @@ interface GameStore {
   selectedPerks: Perk[];
   inventory: InventoryItem[];
   settings: GameSettings;
+  cameraShake: number;
   playerHealth: number;
   playerMaxHealth: number;
-  cameraShake: number;
   playerExp: number;
   playerLevel: number;
   playerNextLevelExp: number;
@@ -77,7 +77,6 @@ interface GameStore {
   selectPerk: (perk: Perk) => void;
   upgradeWeapon: () => void;
   resetSession: () => void;
-  setPlayerHealth: (health: number, maxHealth?: number) => void;
   addCameraShake: (amount: number) => void;
   setCameraShake: (amount: number) => void;
   addExp: (amount: number) => void;
@@ -90,6 +89,7 @@ interface GameStore {
   setInputViewModel: (input: InputViewModel) => void;
   addItemToInventory: (itemId: string, amount?: number) => void;
   setEventBus: (eventBus: EventBus | null) => void;
+  syncPlayerHealth: (health: number, maxHealth: number) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -106,9 +106,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     musicVolume: 1.0,
     screenShake: true,
   },
+  cameraShake: 0,
   playerHealth: 100,
   playerMaxHealth: 100,
-  cameraShake: 0,
   playerExp: 0,
   playerLevel: 1,
   playerNextLevelExp: 100,
@@ -156,9 +156,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           currentWave: 1,
           weaponLevel: 1,
           selectedPerks: [],
+          cameraShake: 0,
           playerHealth: 100,
           playerMaxHealth: 100,
-          cameraShake: 0,
           playerExp: 0,
           playerLevel: 1,
           playerNextLevelExp: 100,
@@ -170,14 +170,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           totalKills: 0,
           timeScale: 1.0,
           timeScaleDuration: 0,
-      };
-  }),
-  setPlayerHealth: (health, maxHealth) => set((state) => {
-      const isDead = health <= 0;
-      return {
-          playerHealth: health,
-          playerMaxHealth: maxHealth ?? state.playerMaxHealth,
-          gameState: isDead ? GameState.GAME_OVER : state.gameState
+          activeBuff: null,
       };
   }),
   addCameraShake: (amount) => set((state) => ({ cameraShake: Math.min(50, state.cameraShake + amount) })),
@@ -195,6 +188,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return {};
   }),
   setFps: (fps) => set(() => ({ fps })),
+  syncPlayerHealth: (health: number, maxHealth: number) => set(() => ({
+    playerHealth: health,
+    playerMaxHealth: maxHealth
+  })),
   setActiveBuff: (buff) => set(() => ({ activeBuff: buff })),
   addExp: (amount) => set((state) => {
       let newExp = state.playerExp + amount;

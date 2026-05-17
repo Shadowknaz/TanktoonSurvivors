@@ -28,15 +28,12 @@ export interface GameContext {
     isMenu: boolean;
     cameraShake: number;
     screenShakeEnabled: boolean;
-    playerHealth: number;
-    playerMaxHealth: number;
     currentSpeed: number;
     activeBuff: BuffState | null;
     goldRushTimeLeft: number;
     totalKills: number;
     timeScale: number;
 
-    setPlayerHealth: (health: number, maxHealth?: number) => void;
     setGameOver: (state: boolean) => void;
     triggerGoldRush: (duration: number) => void;
     updateGoldRushTimeLeft: (dt: number) => void;
@@ -47,4 +44,5 @@ export interface GameContext {
     setCurrentSpeed: (speed: number) => void;
     setActiveBuff: (buff: BuffState | null) => void;
     setTimeScale: (scale: number, duration: number) => void;
+    getPlayerHealth: () => { current: number; max: number } | null;
 }

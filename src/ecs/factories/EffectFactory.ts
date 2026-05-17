@@ -13,6 +13,9 @@ export class EffectFactory {
     Position.x[eid] = x;
     Position.y[eid] = y;
     Position.angle[eid] = angle;
+    Position.prevX[eid] = x;
+    Position.prevY[eid] = y;
+    Position.prevAngle[eid] = angle;
 
     addComponent(world, eid, Renderable);
     Renderable.spriteId[eid] = SpriteId.WRECK;
@@ -49,6 +52,9 @@ export class EffectFactory {
     Position.x[eid] = x;
     Position.y[eid] = y;
     Position.angle[eid] = angle;
+    Position.prevX[eid] = x;
+    Position.prevY[eid] = y;
+    Position.prevAngle[eid] = angle;
 
     addComponent(world, eid, Renderable);
     Renderable.spriteId[eid] = spriteId;
@@ -164,6 +170,8 @@ export class EffectFactory {
     addComponent(world, eid, Position);
     Position.x[eid] = x;
     Position.y[eid] = y;
+    Position.prevX[eid] = x;
+    Position.prevY[eid] = y;
     
     addComponent(world, eid, Renderable);
     Renderable.spriteId[eid] = SpriteId.SMOKE_CLOUD;
@@ -176,7 +184,14 @@ export class EffectFactory {
     
     addComponent(world, eid, Lifetime);
     Lifetime.timer[eid] = 4.0;
-    
+
+    addComponent(world, eid, Particle);
+    Particle.initialLife[eid] = 4.0;
+    Particle.startScale[eid] = GameConfig.SMOKE_CLOUD_START_SCALE;
+    Particle.endScale[eid] = GameConfig.SMOKE_CLOUD_END_SCALE;
+    Particle.startAlpha[eid] = GameConfig.SMOKE_CLOUD_START_ALPHA;
+    Particle.endAlpha[eid] = 0.0;
+
     return eid;
   }
 

@@ -1,17 +1,17 @@
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import {  query , World } from "bitecs";
-import { Position, PlayerControlled, AIBehavior, GameState } from "../components";
+import { Position, AIBehavior, GameState } from "../components";
 import { MapUtils } from "../../utils/MapUtils";
 import { GameConfig } from "../../config/GameConfig";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { ENEMY_SPAWN_POOL } from "../../config/EnemySpawnConfig";
 import { GameContext } from "../../models/GameContext";
+import { EntityUtils } from "../../utils/EntityUtils";
 
 export class SpawnSystem {
   update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, context: GameContext) {
-    const gameStates = query(world, [GameState]);
-    const gs = gameStates[0];
-    if (gs === undefined) return;
+    const gs = EntityUtils.getGameState(world);
+    if (!gs) return;
 
     GameState.spawnTimer[gs] -= deltaTime;
 
@@ -42,15 +42,15 @@ export class SpawnSystem {
           return;
       }
 
-      const players = query(world, [PlayerControlled, Position]);
+      const playerEid = EntityUtils.getFirstPlayer(world);
       const rw = GameConfig.VIRTUAL_WIDTH;
       const rh = GameConfig.VIRTUAL_HEIGHT;
       let px = rw / 2;
       let py = rh / 2;
 
-      if (players.length > 0) {
-        px = Position.x[players[0]];
-        py = Position.y[players[0]];
+      if (playerEid) {
+        px = Position.x[playerEid];
+        py = Position.y[playerEid];
       }
 
       // Try to find a valid spawn position

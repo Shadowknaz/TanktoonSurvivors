@@ -31,6 +31,7 @@ import { CollisionSystem } from "./CollisionSystem";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { EnemyIndex } from "../../services/EnemyIndex";
+import { EntityUtils } from "../../utils/EntityUtils";
 
 export class AISystem {
   private enemyIndex: EnemyIndex;
@@ -59,14 +60,12 @@ export class AISystem {
   update(world: World, context: GameContext, physicsEngine: PhysicsEngine, dt: number) {
     if (context.isGameOver) return;
 
-    const gameStateEntities = query(world, [GameState]);
-    if (gameStateEntities.length === 0) return;
-    const gs = gameStateEntities[0];
+    const gs = EntityUtils.getGameState(world);
+    if (!gs) return;
     const gameTime = GameState.gameTime[gs];
 
-    const players = query(world, [PlayerControlled, Position]);
-    if (players.length === 0) return;
-    const playerEid = players[0];
+    const playerEid = EntityUtils.getFirstPlayer(world);
+    if (!playerEid) return;
 
     this.initializeObstacles(world);
 

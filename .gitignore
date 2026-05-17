@@ -8,3 +8,4 @@ coverage/
 !.env.example
 .GIT_GUIDE.md
 !.GIT_GUIDE.md
+.windsurf/

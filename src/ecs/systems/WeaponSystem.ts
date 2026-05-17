@@ -33,6 +33,7 @@ import { EffectFactory } from "../factories/EffectFactory";
 import Matter from "matter-js";
 import { GameContext } from "../../models/GameContext";
 import { EnemyIndex } from "../../services/EnemyIndex";
+import { EntityUtils } from "../../utils/EntityUtils";
 
 /** Snapshot of per-frame shooter stats, read from ECS components into pre-allocated buffers to avoid GC pressure. */
 interface StatsSnapshot {
@@ -135,8 +136,8 @@ export class WeaponSystem {
         ArcedProjectile.startX[projEid] = px;
         ArcedProjectile.startY[projEid] = py;
         // Need to find player target for predictive aim!
-        const players = query(world, [PlayerControlled, Position]);
-        const playerEid = players[0];
+        const playerEid = EntityUtils.getFirstPlayer(world);
+        if (!playerEid) return;
         ArcedProjectile.targetX[projEid] = Position.x[playerEid];
         ArcedProjectile.targetY[projEid] = Position.y[playerEid];
         ArcedProjectile.progress[projEid] = 0;
@@ -221,9 +222,8 @@ export class WeaponSystem {
   }
 
   update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, _context: GameContext) {
-    const gameStateEntities = query(world, [GameState]);
-    if (gameStateEntities.length === 0) return;
-    const gs = gameStateEntities[0];
+    const gs = EntityUtils.getGameState(world);
+    if (!gs) return;
     const gameTime = GameState.gameTime[gs];
 
     const shooters = query(world, [Position, Weapon]);

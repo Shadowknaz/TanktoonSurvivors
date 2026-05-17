@@ -14,6 +14,7 @@ export class PhysicsEngine {
   public world: Matter.World;
   private bodiesMap: Map<number, Matter.Body> = new Map();
   private collisionEvents: Matter.IEventCollision<Matter.Engine>[] = [];
+  private isDestroyed = false;
 
   constructor() {
     this.engine = Matter.Engine.create({
@@ -36,44 +37,37 @@ export class PhysicsEngine {
     return events;
   }
 
-  createRectangleBody(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    options: Matter.IChamferableBodyDefinition = {},
-    eid?: number,
-  ): Matter.Body {
+  createRectangleBody(x: number, y: number, width: number, height: number, options: Matter.IBodyDefinition, eid: number): Matter.Body {
+    if (this.isDestroyed) throw new Error('PhysicsEngine is destroyed');
+    const { chamfer, ...restOptions } = options || {};
     const body = Matter.Bodies.rectangle(x, y, width, height, {
       density: PhysicsConfig.DENSITY,
       friction: PhysicsConfig.FRICTION,
       frictionAir: 0.1, // Added for top-down games to stop gliding forever
       restitution: PhysicsConfig.RESTITUTION,
-      ...options,
+      ...(chamfer != null ? { chamfer } : {}),
+      ...restOptions,
     });
-    if (eid !== undefined) body.eid = eid;
-    Matter.World.add(this.world, body);
     this.bodiesMap.set(body.id, body);
+    body.eid = eid;
+    Matter.World.add(this.world, body);
     return body;
   }
 
-  createCircleBody(
-    x: number,
-    y: number,
-    radius: number,
-    options: Matter.IChamferableBodyDefinition = {},
-    eid?: number,
-  ): Matter.Body {
+  createCircleBody(x: number, y: number, radius: number, options: Matter.IBodyDefinition, eid: number): Matter.Body {
+    if (this.isDestroyed) throw new Error('PhysicsEngine is destroyed');
+    const { chamfer, ...restOptions } = options || {};
     const body = Matter.Bodies.circle(x, y, radius, {
       density: PhysicsConfig.DENSITY,
       friction: PhysicsConfig.FRICTION,
       frictionAir: 0.1, // Added for top-down games
       restitution: PhysicsConfig.RESTITUTION,
-      ...options,
+      ...(chamfer != null ? { chamfer } : {}),
+      ...restOptions,
     });
-    if (eid !== undefined) body.eid = eid;
-    Matter.World.add(this.world, body);
     this.bodiesMap.set(body.id, body);
+    body.eid = eid;
+    Matter.World.add(this.world, body);
     return body;
   }
 
@@ -90,6 +84,7 @@ export class PhysicsEngine {
   }
 
   removeBody(body: Matter.Body): void {
+    if (this.isDestroyed) return;
     Matter.World.remove(this.world, body);
     this.bodiesMap.delete(body.id);
   }
@@ -104,6 +99,8 @@ export class PhysicsEngine {
   }
 
   destroy(): void {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
     Matter.World.clear(this.world, false);
     Matter.Engine.clear(this.engine);
     this.bodiesMap.clear();

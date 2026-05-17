@@ -63,3 +63,51 @@ export const PositionComponent = defineComponent({
    `sprite.x = PositionComponent.x[eid];`
 
 Такой подход гарантирует однонаправленный поток данных (Physics -> ECS -> Pixi) и максимальную производительность.
+
+## Безопасность доступа к Entity ID
+
+Для предотвращения ошибок при доступе к несуществующим сущностям используется branded тип `EntityId` и утилита `EntityUtils`:
+
+```typescript
+// types.ts
+export type EntityId = number & { readonly __entityId: unique symbol };
+
+// EntityUtils.ts
+EntityUtils.getFirstPlayer(world)  // Возвращает EntityId | undefined
+EntityUtils.getGameState(world)    // Возвращает EntityId | undefined
+```
+
+Все ECS системы теперь используют `EntityUtils` вместо прямого доступа к `players[0]` или `gameStates[0]`, что предотвращает `undefined` ошибки при сбросе уровня.
+
+## Управление здоровьем (Single Source of Truth)
+
+Здоровье хранится исключительно в ECS компоненте `Health`. GameStore содержит только readonly snapshot для UI:
+
+- ECS `Health.current/max` — единственный источник истины
+- `GameApp.getPlayerHealth()` читает из ECS
+- `GameStore.syncPlayerHealth()` обновляет UI readonly значение
+- Все системы обновляют только `Health.current/max` в ECS
+
+## Валидация lifecycle PhysicsEngine
+
+`PhysicsEngine` имеет флаг `isDestroyed` для предотвращения использования после удаления:
+
+```typescript
+class PhysicsEngine {
+  private isDestroyed = false;
+  
+  createRectangleBody() {
+    if (this.isDestroyed) throw new Error('PhysicsEngine is destroyed');
+  }
+  
+  destroy() {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+    // ... очистка
+  }
+}
+```
+
+## Локальные Set для AOE урона
+
+Статический `shrapnelProcessedSet` заменен на локальный `Set`, создаваемый при каждом вызове AOE урона. Это предотвращает накопление состояния между вызовами и упрощает логику.

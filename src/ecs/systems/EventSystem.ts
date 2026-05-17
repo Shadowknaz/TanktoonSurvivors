@@ -1,5 +1,5 @@
 import {  addEntity, addComponent, query, removeEntity, hasComponent, removeComponent, World } from "bitecs";
-import { Position, WarningMarker, PlayerControlled, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating } from "../components";
+import { Position, WarningMarker, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating } from "../components";
 import { SpriteId, ComicTextType } from "../../models/types";
 import { EventConfig } from "../../config/EventConfig";
 import { MathUtils } from "../../utils/MathUtils";
@@ -14,6 +14,7 @@ import { CollisionCategory } from "../../config/PhysicsConfig";
 import { CollisionSystem } from "./CollisionSystem";
 import { GameContext } from "../../models/GameContext";
 import { EnemyIndex } from "../../services/EnemyIndex";
+import { EntityUtils } from "../../utils/EntityUtils";
 
 export class EventSystem {
   private nextEventFrames: number = 0;
@@ -30,10 +31,9 @@ export class EventSystem {
   update(world: World, physicsEngine: PhysicsEngine, dt: number, context: GameContext) {
     this.nextEventFrames--;
 
-    const players = query(world, [PlayerControlled, Position, Velocity]);
+    const playerEntity = EntityUtils.getFirstPlayer(world);
     
-    if (this.nextEventFrames <= 0 && players.length > 0) {
-      const playerEntity = players[0];
+    if (this.nextEventFrames <= 0 && playerEntity) {
       const px = Position.x[playerEntity];
       const py = Position.y[playerEntity];
       const vx = Velocity.x[playerEntity];

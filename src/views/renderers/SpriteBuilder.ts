@@ -446,14 +446,14 @@ export class SpriteBuilder {
     }
     
     for (let p of puffs) {
-        sprite.circle(p.x + SketchUtils.jitter(1.5), p.y + SketchUtils.jitter(1.5), p.r);
+        sprite.circle(p.x, p.y, p.r);
     }
     sprite.fill({ color: 0x444444 });
-    
+
     sprite.beginPath();
     for (let c = 0; c < 2; c++) {
       for (let p of puffs) {
-          sprite.circle(p.x + SketchUtils.jitter(1.5), p.y + SketchUtils.jitter(1.5), p.r);
+          sprite.circle(p.x + SketchUtils.jitter(0.8), p.y + SketchUtils.jitter(0.8), p.r);
       }
     }
     sprite.stroke({ width: 2, color: 0x111111, join: 'round', cap: 'round', alpha: 0.8 });
@@ -1025,17 +1025,16 @@ export class SpriteBuilder {
         puffs.push({ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, r: puffRadius });
     }
     
-    // Fill all with jittered positions
     for (let p of puffs) {
-        sprite.circle(p.x + SketchUtils.jitter(1.5), p.y + SketchUtils.jitter(1.5), p.r);
+        sprite.circle(p.x, p.y, p.r);
     }
     sprite.fill({ color: 0xffffff });
-    
+
     // Outline all
     sprite.beginPath();
     for (let c = 0; c < 2; c++) {
       for (let p of puffs) {
-          sprite.circle(p.x + SketchUtils.jitter(1.5), p.y + SketchUtils.jitter(1.5), p.r);
+          sprite.circle(p.x + SketchUtils.jitter(0.8), p.y + SketchUtils.jitter(0.8), p.r);
       }
     }
     sprite.stroke({ width: 3, color: 0x000000, join: 'round', cap: 'round' });

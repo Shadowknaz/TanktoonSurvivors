@@ -31,6 +31,7 @@ import { RandomUtils } from "../../utils/RandomUtils";
 import { PoolManager, PooledContainer } from "../../services/PoolManager";
 import { GameContext } from "../../models/GameContext";
 import { DeviceUtils } from "../../utils/DeviceUtils";
+import { EntityUtils } from "../../utils/EntityUtils";
 
 export class RenderSystem {
   private spriteMap: Map<number, PooledContainer> = new Map();
@@ -46,28 +47,27 @@ export class RenderSystem {
       if (!renderer.app || !renderer.app.stage) return;
       this.frameCount++;
   
-      const gameStateEntities = query(world, [GameState]);
-      if (gameStateEntities.length === 0) return;
-      const gs = gameStateEntities[0];
+      const gs = EntityUtils.getGameState(world);
+      if (!gs) return;
       const gameTime = GameState.gameTime[gs];
       // Interpolated game time for smooth visual effects (fog, recoil, etc.)
       const visualTime = gameTime - GameConfig.FIXED_DELTA_TIME + (GameConfig.FIXED_DELTA_TIME * alpha);
 
-      this.updateCamera(world, renderer, context, visualTime, alpha);
+      const isPaused = context.isLevelingUp || context.isGameOver || context.isMenu;
+      this.updateCamera(world, renderer, context, visualTime, alpha, isPaused);
       this.updateTrackMarks(world);
   
       const entities = query(world, [Position, Renderable]);
       this.activeEids.clear();
-      this.renderEntities(world, renderer, entities, context, visualTime, alpha);
+      this.renderEntities(world, renderer, entities, context, visualTime, alpha, isPaused);
       
       this.cleanupSpriteMap(renderer, this.activeEids);
     }
   
-    private updateCamera(world: World, renderer: PixiRenderer, context: GameContext, gameTime: number, alpha: number) {
+    private updateCamera(world: World, renderer: PixiRenderer, context: GameContext, gameTime: number, alpha: number, isPaused: boolean) {
       // Camera follow player
-      const players = query(world, [PlayerControlled, Position]);
-      if (players.length > 0) {
-        const eid = players[0];
+      const eid = EntityUtils.getFirstPlayer(world);
+      if (eid) {
         let px = MathUtils.lerp(Position.prevX[eid], Position.x[eid], alpha);
         let py = MathUtils.lerp(Position.prevY[eid], Position.y[eid], alpha);
 
@@ -108,7 +108,7 @@ export class RenderSystem {
           renderer.fogTiling.tilePosition.y = (-py * 1.05 * renderer.gameContainer.scale.x) + rh / 2 + gameTime * 10;
         }
         
-        let shake = context.cameraShake;
+        let shake = isPaused ? 0 : context.cameraShake;
         if (shake > 0 && context.screenShakeEnabled) {
             const shakeX = (RandomUtils.random() - 0.5) * shake;
             const shakeY = (RandomUtils.random() - 0.5) * shake;
@@ -146,7 +146,7 @@ export class RenderSystem {
       }
     }
   
-    private renderEntities(world: World, renderer: PixiRenderer, entities: QueryResult, context: GameContext, gameTime: number, alpha: number): void {
+    private renderEntities(world: World, renderer: PixiRenderer, entities: QueryResult, context: GameContext, gameTime: number, alpha: number, isPaused: boolean): void {
       for (let i = 0; i < entities.length; i++) {
         const eid = entities[i];
         this.activeEids.add(eid);
@@ -203,7 +203,7 @@ export class RenderSystem {
               break;
             case SpriteId.SMOKE_CLOUD:
               container.zIndex = 5;
-              container.blendMode = 'multiply';
+              container.blendMode = 'normal';
               break;
             default:
               container.zIndex = 0;
@@ -222,21 +222,21 @@ export class RenderSystem {
               // The outer circle is static, we can shrink an inner circle by redrawing or we can just scale the whole thing.
               container.scale.set(1);
               SpriteBuilder.buildSprite(world, eid, spriteId, container);
-          } else if (isBoiling && (this.frameCount + eid) % GameConfig.BOILING_LINES_INTERVAL_FRAMES === 0) {
+          } else if (!isPaused && isBoiling && (this.frameCount + eid) % GameConfig.BOILING_LINES_INTERVAL_FRAMES === 0) {
               SpriteBuilder.buildSprite(world, eid, spriteId, container);
           }
         }
   
-        container.visible = Renderable.visible[eid] === 1;
+        const isParticle = hasComponent(world, eid, Particle);
+        container.visible = Renderable.visible[eid] === 1 && (!isPaused || !isParticle);
   
         let shouldStepTransform = true;
-        const isParticle = hasComponent(world, eid, Particle);
         const isWreck = hasComponent(world, eid, Wreck);
         const isWarning = spriteId === SpriteId.WARNING_MARKER;
         const isAirdrop = hasComponent(world, eid, Airdrop);
   
         // Handle Particle-specific animations
-        if (isParticle && hasComponent(world, eid, Lifetime)) {
+        if (!isPaused && isParticle && hasComponent(world, eid, Lifetime)) {
            const lifeRatio = 1.0 - Math.max(0, Lifetime.timer[eid] / Particle.initialLife[eid]); 
            const scale = Particle.startScale[eid] + (Particle.endScale[eid] - Particle.startScale[eid]) * lifeRatio;
            container.scale.set(scale);
@@ -345,7 +345,9 @@ export class RenderSystem {
               }
           }
   
-          container.scale.set(visualScale);
+          if (!isParticle) {
+            container.scale.set(visualScale);
+          }
 
           // Burrowed emerge animation (Sapper)
           if (hasComponent(world, eid, Burrowed)) {
@@ -383,13 +385,13 @@ export class RenderSystem {
           }
 
           // Flamer flame effect — update every frame based on isSpraying
-          if (spriteId === SpriteId.ENEMY_FLAMER && hasComponent(world, eid, FlamerTank)) {
+          if (!isPaused && spriteId === SpriteId.ENEMY_FLAMER && hasComponent(world, eid, FlamerTank)) {
             this.updateFlamerFlame(eid, container);
           }
-          
-          if (hasComponent(world, eid, Wreck) && hasComponent(world, eid, Lifetime)) {
+
+          if (!isPaused && hasComponent(world, eid, Wreck) && hasComponent(world, eid, Lifetime)) {
             const lifeRatio = Lifetime.timer[eid] / Wreck.maxTimer[eid];
-            
+
             if (lifeRatio > 0.6) {
               container.alpha = 0.8;
               if (RandomUtils.random() < 0.2) {

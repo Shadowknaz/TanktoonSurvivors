@@ -1,8 +1,9 @@
-import { World, query, hasComponent } from "bitecs";
-import { PlayerControlled, PlayerStats, Health } from "../components";
+import { World, hasComponent } from "bitecs";
+import { PlayerStats, Health } from "../components";
 import { EventBus } from "../../core/EventBus";
 import { UpgradesChangedEvent } from "../../models/events";
 import { StatsUtils } from "../../utils/StatsUtils";
+import { EntityUtils } from "../../utils/EntityUtils";
 
 export class UpgradeSystem {
     private pendingEvent: UpgradesChangedEvent | null = null;
@@ -24,9 +25,8 @@ export class UpgradeSystem {
         const event = this.pendingEvent;
         this.pendingEvent = null; // Clear event
 
-        const players = query(world, [PlayerControlled, PlayerStats]);
-        if (players.length > 0) {
-            const eid = players[0];
+        const eid = EntityUtils.getFirstPlayer(world);
+        if (eid) {
 
             // Reset to base stats before applying upgrades
             StatsUtils.resetPlayerStats(eid);
