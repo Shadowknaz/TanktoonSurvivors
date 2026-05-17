@@ -1,9 +1,11 @@
 import Matter from "matter-js";
-import { PhysicsConfig, CollisionCategory } from "../config/PhysicsConfig";
+import { PhysicsConfig } from "../config/PhysicsConfig";
 
 declare module "matter-js" {
   interface Body {
     eid?: number;
+    /** Tracks the cumulative scale applied via Matter.Body.scale() so the pool can invert it on reset. */
+    currentScale?: number;
   }
 }
 

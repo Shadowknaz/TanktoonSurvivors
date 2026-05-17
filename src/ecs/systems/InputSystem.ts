@@ -1,8 +1,7 @@
-import {  query, hasComponent, addComponent , World } from "bitecs";
+import {  query, hasComponent, World } from "bitecs";
 import { PlayerControlled, Position, Velocity, Weapon, Health, PlayerBuffs, PlayerStats } from "../components";
 import { InputState } from "../../viewmodels/InputViewModel";
 import { GameConfig } from "../../config/GameConfig";
-import { RenderConfig } from "../../config/RenderConfig";
 import { MathUtils } from "../../utils/MathUtils";
 import { EffectFactory } from "../factories/EffectFactory";
 import { EventConfig } from "../../config/EventConfig";

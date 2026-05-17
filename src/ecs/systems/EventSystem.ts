@@ -1,9 +1,10 @@
 import {  addEntity, addComponent, query, removeEntity, hasComponent, removeComponent, World } from "bitecs";
-import { Position, WarningMarker, PlayerControlled, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, AIBehavior, PlayerBuffs, Landmine, Lifetime, Explosive, Airdrop, Detonating } from "../components";
-import { SpriteId, OwnerType, ComicTextType } from "../../models/types";
+import { Position, WarningMarker, PlayerControlled, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating } from "../components";
+import { SpriteId, ComicTextType } from "../../models/types";
 import { EventConfig } from "../../config/EventConfig";
 import { MathUtils } from "../../utils/MathUtils";
 import { MapUtils } from "../../utils/MapUtils";
+import { RandomUtils } from "../../utils/RandomUtils";
 import { CellularAutomata } from "../../utils/CellularAutomata";
 import { EffectFactory } from "../factories/EffectFactory";
 import { EnemyFactory } from "../factories/EnemyFactory";
@@ -12,12 +13,13 @@ import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
 import { CollisionSystem } from "./CollisionSystem";
 import { GameContext } from "../../models/GameContext";
+import { EnemyIndex } from "../../services/EnemyIndex";
 
 export class EventSystem {
   private nextEventFrames: number = 0;
   private artilleryQueue: {x: number, y: number, countdown: number}[] = [];
 
-  constructor() {
+  constructor(_enemyIndex: EnemyIndex) {
     this.scheduleNextEvent();
   }
 
@@ -101,25 +103,25 @@ export class EventSystem {
   }
 
   private triggerRandomEvent(world: World, physicsEngine: PhysicsEngine, px: number, py: number, context: GameContext) {
-    if (context.totalKills > 100 && Math.random() < 0.1 && context.goldRushTimeLeft <= 0) {
+    if (context.totalKills > 100 && RandomUtils.random() < 0.1 && context.goldRushTimeLeft <= 0) {
       context.triggerGoldRush(30);
       EffectFactory.spawnComicEffect(world, px, py - 60, ComicTextType.GOLD_RUSH); 
       return;
     }
 
-    const eventType = Math.floor(Math.random() * 5); // 0 to 4
+    const eventType = Math.floor(RandomUtils.random() * 5); // 0 to 4
     
     switch (eventType) {
       case 0: // Bomber
-        const offsetBx = (Math.random() - 0.5) * 300;
-        const offsetBy = (Math.random() - 0.5) * 300;
+        const offsetBx = (RandomUtils.random() - 0.5) * 300;
+        const offsetBy = (RandomUtils.random() - 0.5) * 300;
         const bPos = MapUtils.clampToMapBounds(px + offsetBx, py + offsetBy, 50);
         this.spawnWarningMarker(world, bPos.x, bPos.y, EventConfig.BOMBER_RADIUS, EventConfig.BOMBER_WARNING_FRAMES, 0);
         break;
       case 1: // Artillery
         for (let i = 0; i < EventConfig.ARTILLERY_COUNT; i++) {
-          const offsetX = (Math.random() - 0.5) * 400;
-          const offsetY = (Math.random() - 0.5) * 400;
+          const offsetX = (RandomUtils.random() - 0.5) * 400;
+          const offsetY = (RandomUtils.random() - 0.5) * 400;
           const aPos = MapUtils.clampToMapBounds(px + offsetX, py + offsetY, 50);
           this.artilleryQueue.push({
             x: aPos.x,
@@ -129,8 +131,8 @@ export class EventSystem {
         }
         break;
       case 2: // Loot Drop
-        const offsetX = (Math.random() - 0.5) * 300;
-        const offsetY = (Math.random() - 0.5) * 300;
+        const offsetX = (RandomUtils.random() - 0.5) * 300;
+        const offsetY = (RandomUtils.random() - 0.5) * 300;
         const lPos = MapUtils.clampToMapBounds(px + offsetX, py + offsetY, 50);
         this.spawnWarningMarker(world, lPos.x, lPos.y, EventConfig.LOOT_RADIUS, 240, 2);
         break;
@@ -167,7 +169,7 @@ export class EventSystem {
     Position.y[eid] = y;
 
     addComponent(world, eid, LootDrop);
-    LootDrop.type[eid] = Math.random() > 0.5 ? EventConfig.LOOT_TYPES.SPEED : EventConfig.LOOT_TYPES.INVULNERABLE;
+    LootDrop.type[eid] = RandomUtils.random() > 0.5 ? EventConfig.LOOT_TYPES.SPEED : EventConfig.LOOT_TYPES.INVULNERABLE;
     
     addComponent(world, eid, Renderable);
     Renderable.spriteId[eid] = SpriteId.LOOT_CRATE;
@@ -193,8 +195,8 @@ export class EventSystem {
     const cellSize = 50;
     
     // Offset the cluster somewhere near the player
-    const offsetX = (Math.random() - 0.5) * 500;
-    const offsetY = (Math.random() - 0.5) * 500;
+    const offsetX = (RandomUtils.random() - 0.5) * 500;
+    const offsetY = (RandomUtils.random() - 0.5) * 500;
     const cx = px + offsetX;
     const cy = py + offsetY;
 
@@ -204,8 +206,8 @@ export class EventSystem {
     for (let y = 0; y < gridH; y++) {
         for (let x = 0; x < gridW; x++) {
             if (grid[y][x]) {
-                const targetX = cx + (x - Math.floor(gridW/2)) * cellSize + (Math.random() - 0.5) * 20;
-                const targetY = cy + (y - Math.floor(gridH/2)) * cellSize + (Math.random() - 0.5) * 20;
+                const targetX = cx + (x - Math.floor(gridW/2)) * cellSize + (RandomUtils.random() - 0.5) * 20;
+                const targetY = cy + (y - Math.floor(gridH/2)) * cellSize + (RandomUtils.random() - 0.5) * 20;
                 const pos = MapUtils.clampToMapBounds(targetX, targetY, 50);
 
                 this.spawnLandmine(world, physicsEngine, pos.x, pos.y);
@@ -219,8 +221,8 @@ export class EventSystem {
     
     // In case CA didn't fill enough, just spawn the rest randomly
     while (spawned < EventConfig.CLUSTER_MINES_COUNT) {
-        const targetX = cx + (Math.random() - 0.5) * gridW * cellSize;
-        const targetY = cy + (Math.random() - 0.5) * gridH * cellSize;
+        const targetX = cx + (RandomUtils.random() - 0.5) * gridW * cellSize;
+        const targetY = cy + (RandomUtils.random() - 0.5) * gridH * cellSize;
         const pos = MapUtils.clampToMapBounds(targetX, targetY, 50);
         this.spawnLandmine(world, physicsEngine, pos.x, pos.y);
         spawned++;

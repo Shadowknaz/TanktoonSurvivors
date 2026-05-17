@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { GameApp } from "./core/GameApp";
 import { UIOverlay } from "./components/UIOverlay";
-import { RenderConfig } from "./config/RenderConfig";
+import { GameConfig } from "./config/GameConfig";
 import { DeviceUtils } from "./utils/DeviceUtils";
 import { MobileControls } from "./components/ui/MobileControls";
 import { OrientationGuard } from "./components/OrientationGuard";
@@ -38,8 +38,8 @@ export default function App() {
       <div
         className={`shadow-2xl overflow-hidden relative bg-[#fdfbf7] ${isMobile ? 'w-full h-full' : 'rounded-lg aspect-video max-h-screen'}`}
         style={!isMobile ? {
-          width: RenderConfig.SCREEN_WIDTH,
-          height: RenderConfig.SCREEN_HEIGHT,
+          width: GameConfig.VIRTUAL_WIDTH,
+          height: GameConfig.VIRTUAL_HEIGHT,
           maxWidth: "100%",
           maxHeight: "100%",
         } : {}}

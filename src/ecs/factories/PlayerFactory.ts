@@ -1,5 +1,4 @@
-import {  addComponent, addEntity , World } from "bitecs";
-import { world } from "../world";
+import { addComponent, addEntity, World } from "bitecs";
 import {
   Position,
   Velocity,
@@ -7,7 +6,6 @@ import {
   Renderable,
   PlayerControlled,
   MatterBody,
-  Weapon,
   Weapon,
   PlayerBuffs,
   TankTracks,
@@ -17,7 +15,7 @@ import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { GameConfig } from "../../config/GameConfig";
 import { CollisionCategory } from "../../config/PhysicsConfig";
 import { useGameStore } from "../../stores/GameStore";
-import { SpriteId, GameState } from "../../models/types";
+import { SpriteId } from "../../models/types";
 import { StatsUtils } from "../../utils/StatsUtils";
 
 export class PlayerFactory {

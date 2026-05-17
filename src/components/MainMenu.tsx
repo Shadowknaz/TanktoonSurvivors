@@ -3,8 +3,8 @@ import { useGameStore } from '../stores/GameStore';
 import { GameState } from '../models/types';
 import { en } from '../localization/en';
 
-export const MainMenu: React.FC = () => {
-    const { setGameState } = useGameStore();
+export const MainMenu: React.FC = React.memo(() => {
+    const setGameState = useGameStore(s => s.setGameState);
 
     return (
         <div className="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center pointer-events-auto z-[60]">
@@ -19,4 +19,7 @@ export const MainMenu: React.FC = () => {
             </button>
         </div>
     );
-};
+});
+
+MainMenu.displayName = 'MainMenu';
+

@@ -7,7 +7,6 @@ import {
   AIBehavior,
   Position,
   Renderable,
-  Lifetime,
   Wall,
   Rammer,
   ContactDamage,
@@ -41,6 +40,7 @@ import { RandomUtils } from "../../utils/RandomUtils";
 import Matter from "matter-js";
 import { PoolManager } from "../../services/PoolManager";
 import { GameContext } from "../../models/GameContext";
+import { EnemyIndex } from "../../services/EnemyIndex";
 
 type KillStreakThreshold = { kills: number, text: ComicTextType, shake: number };
 
@@ -53,6 +53,12 @@ const KILL_STREAK_THRESHOLDS: KillStreakThreshold[] = [
 
 
 export class CollisionSystem {
+  private enemyIndex: EnemyIndex;
+
+  constructor(enemyIndex: EnemyIndex) {
+    this.enemyIndex = enemyIndex;
+  }
+
   static handleEnemyKill(world: World, context: GameContext, x: number, y: number, ownerType: OwnerType) {
     let xpMultiplier = 1;
 
@@ -119,6 +125,9 @@ export class CollisionSystem {
         }
 
         const isEidPlayer = hasComponent(world, eid, PlayerControlled);
+        if (isEidPlayer && (Health.current[eid] <= 0 || context.isGameOver)) {
+            continue;
+        }
         const isEidEnemy = hasComponent(world, eid, AIBehavior);
         const isEidLandmine = hasComponent(world, eid, Landmine);
         
@@ -150,13 +159,23 @@ export class CollisionSystem {
                             }
                         } else if (defChance > 0 && RandomUtils.random() < defChance) {
                             deflected = true;
+                            let shouldSyncHealth = false;
                             if (PlayerStats.hasReactiveArmor[eid]) {
                                 PlayerBuffs.deflectionCount[eid]++;
                                 if (PlayerBuffs.deflectionCount[eid] >= GameConfig.SYNERGY_REACTIVE_ARMOR_DEFLECTIONS_NEEDED) {
                                     PlayerBuffs.deflectionCount[eid] = 0;
                                     const h = Health.current[eid] + GameConfig.SYNERGY_REACTIVE_ARMOR_HEAL;
                                     Health.current[eid] = Math.min(h, Health.max[eid]);
+                                    shouldSyncHealth = true;
                                 }
+                            }
+                            if (PlayerStats.hasVampiricArmor[eid]) {
+                                const h = Health.current[eid] + GameConfig.SYNERGY_VAMPIRIC_ARMOR_HEAL;
+                                Health.current[eid] = Math.min(h, Health.max[eid]);
+                                shouldSyncHealth = true;
+                            }
+                            if (shouldSyncHealth && isEidPlayer) {
+                                context.setPlayerHealth(Health.current[eid], Health.max[eid]);
                             }
                         }
                     }
@@ -390,6 +409,9 @@ export class CollisionSystem {
             EffectFactory.spawnParticleBubble(world, Position.x[sourceEid], Position.y[sourceEid]);
         }
     } else if (hasComponent(world, targetEid, Health) && canDamage) {
+        if (isTargetPlayer && (Health.current[targetEid] <= 0 || context.isGameOver)) {
+            return;
+        }
         impact = true;
         
         let deflected = false;
@@ -407,13 +429,23 @@ export class CollisionSystem {
                     }
                 } else if (defChance > 0 && RandomUtils.random() < defChance) {
                     deflected = true;
+                    let shouldSyncHealth = false;
                     if (PlayerStats.hasReactiveArmor[targetEid]) {
                         PlayerBuffs.deflectionCount[targetEid]++;
                         if (PlayerBuffs.deflectionCount[targetEid] >= GameConfig.SYNERGY_REACTIVE_ARMOR_DEFLECTIONS_NEEDED) {
                             PlayerBuffs.deflectionCount[targetEid] = 0;
                             const h = Health.current[targetEid] + GameConfig.SYNERGY_REACTIVE_ARMOR_HEAL;
                             Health.current[targetEid] = Math.min(h, Health.max[targetEid]);
+                            shouldSyncHealth = true;
                         }
+                    }
+                    if (PlayerStats.hasVampiricArmor[targetEid]) {
+                        const h = Health.current[targetEid] + GameConfig.SYNERGY_VAMPIRIC_ARMOR_HEAL;
+                        Health.current[targetEid] = Math.min(h, Health.max[targetEid]);
+                        shouldSyncHealth = true;
+                    }
+                    if (shouldSyncHealth) {
+                        context.setPlayerHealth(Health.current[targetEid], Health.max[targetEid]);
                     }
                 }
             }
@@ -427,24 +459,10 @@ export class CollisionSystem {
             // Ricochet logic
             EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 20, ComicTextType.BAM);
             
-            // Find nearest enemy to deflect towards
-            const enemies = query(world, [Position, AIBehavior]);
-            let nearestEnemy = -1;
-            let minDist = Infinity;
+            // Find nearest enemy to deflect towards using spatial grid index
             const px = Position.x[targetEid];
             const py = Position.y[targetEid];
-
-            for (let i = 0; i < enemies.length; i++) {
-                const tEnemy = enemies[i];
-                if (tEnemy === targetEid) continue;
-                const dx = Position.x[tEnemy] - px;
-                const dy = Position.y[tEnemy] - py;
-                const distSq = dx * dx + dy * dy;
-                if (distSq < minDist) {
-                    minDist = distSq;
-                    nearestEnemy = tEnemy;
-                }
-            }
+            const nearestEnemy = this.enemyIndex.getNearestEnemy(px, py, GameConfig.MAP_WIDTH, targetEid);
 
             Projectile.ownerType[sourceEid] = OwnerType.PLAYER;
             ContactDamage.value[sourceEid] = Math.floor(damage * 0.5); // 50% damage
@@ -560,23 +578,9 @@ export class CollisionSystem {
                 
                 // Ricochet synergy
                 if (ownerType === OwnerType.PLAYER && playerEid !== -1 && PlayerStats.hasRicochet[playerEid]) {
-                    const enemies = query(world, [Position, AIBehavior]);
-                    let nearestEnemy = -1;
-                    let minDist = Infinity;
                     const px = Position.x[targetEid];
                     const py = Position.y[targetEid];
-
-                    for (let i = 0; i < enemies.length; i++) {
-                        const tEnemy = enemies[i];
-                        if (tEnemy === targetEid) continue;
-                        const dx = Position.x[tEnemy] - px;
-                        const dy = Position.y[tEnemy] - py;
-                        const distSq = dx * dx + dy * dy;
-                        if (distSq < minDist) {
-                            minDist = distSq;
-                            nearestEnemy = tEnemy;
-                        }
-                    }
+                    const nearestEnemy = this.enemyIndex.getNearestEnemy(px, py, GameConfig.MAP_WIDTH, targetEid);
                     
                     if (nearestEnemy !== -1) {
                         const bodyId = MatterBody.bodyId[sourceEid];
@@ -595,23 +599,9 @@ export class CollisionSystem {
             } else if (isSourceProjectile && hasComponent(world, sourceEid, Chain) && Chain.count[sourceEid] > 0 && !isTargetWall) {
                 Chain.count[sourceEid] -= 1;
                 
-                const enemies = query(world, [Position, AIBehavior]);
-                let nearestEnemy = -1;
-                let minDist = Infinity;
                 const px = Position.x[targetEid];
                 const py = Position.y[targetEid];
-
-                for (let i = 0; i < enemies.length; i++) {
-                    const tEnemy = enemies[i];
-                    if (tEnemy === targetEid) continue;
-                    const dx = Position.x[tEnemy] - px;
-                    const dy = Position.y[tEnemy] - py;
-                    const distSq = dx * dx + dy * dy;
-                    if (distSq < minDist) {
-                        minDist = distSq;
-                        nearestEnemy = tEnemy;
-                    }
-                }
+                const nearestEnemy = this.enemyIndex.getNearestEnemy(px, py, GameConfig.MAP_WIDTH, targetEid);
                 
                 if (nearestEnemy !== -1) {
                     const bodyId = MatterBody.bodyId[sourceEid];

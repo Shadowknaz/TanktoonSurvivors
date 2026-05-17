@@ -2,7 +2,6 @@ import { query, hasComponent, World, removeComponent, removeEntity } from "bitec
 import { MatterBody, Position, Velocity, PlayerControlled, AIBehavior, Airdrop, ArcedProjectile } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { EffectFactory } from "../factories/EffectFactory";
-import { CollisionSystem } from "./CollisionSystem";
 import { GameConfig } from "../../config/GameConfig";
 import Matter from "matter-js";
 

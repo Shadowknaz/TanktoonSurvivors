@@ -1,4 +1,4 @@
-import {  query, hasComponent, World, removeComponent } from "bitecs";
+import {  query, hasComponent, World, removeComponent, QueryResult } from "bitecs";
 import {
   Position,
   Renderable,
@@ -27,13 +27,20 @@ import { SpriteBuilder } from "../../views/renderers/SpriteBuilder";
 import { SpriteId, AIState } from "../../models/types";
 import { EffectFactory } from "../factories/EffectFactory";
 import { MathUtils } from "../../utils/MathUtils";
-import { PoolManager } from "../../services/PoolManager";
+import { RandomUtils } from "../../utils/RandomUtils";
+import { PoolManager, PooledContainer } from "../../services/PoolManager";
 import { GameContext } from "../../models/GameContext";
 import { DeviceUtils } from "../../utils/DeviceUtils";
 
 export class RenderSystem {
-  private spriteMap: Map<number, PIXI.Container> = new Map();
+  private spriteMap: Map<number, PooledContainer> = new Map();
   private frameCount: number = 0;
+  private activeEids: Set<number> = new Set();
+
+  private static readonly STATIC_SPRITES = new Set<number>([
+    SpriteId.WALL, SpriteId.TREE, SpriteId.HOUSE, SpriteId.BROKEN_HOUSE,
+    SpriteId.RAVINE, SpriteId.DIRT_PATCH, SpriteId.COMIC_EFFECT, SpriteId.LOOT_CRATE
+  ]);
 
   update(world: World, renderer: PixiRenderer, context: GameContext, alpha: number) {
       if (!renderer.app || !renderer.app.stage) return;
@@ -50,9 +57,10 @@ export class RenderSystem {
       this.updateTrackMarks(world);
   
       const entities = query(world, [Position, Renderable]);
-      const activeEids = this.renderEntities(world, renderer, entities, context, visualTime, alpha);
+      this.activeEids.clear();
+      this.renderEntities(world, renderer, entities, context, visualTime, alpha);
       
-      this.cleanupSpriteMap(renderer, activeEids);
+      this.cleanupSpriteMap(renderer, this.activeEids);
     }
   
     private updateCamera(world: World, renderer: PixiRenderer, context: GameContext, gameTime: number, alpha: number) {
@@ -102,8 +110,8 @@ export class RenderSystem {
         
         let shake = context.cameraShake;
         if (shake > 0 && context.screenShakeEnabled) {
-            const shakeX = (Math.random() - 0.5) * shake;
-            const shakeY = (Math.random() - 0.5) * shake;
+            const shakeX = (RandomUtils.random() - 0.5) * shake;
+            const shakeY = (RandomUtils.random() - 0.5) * shake;
             renderer.gameContainer.position.x += shakeX;
             renderer.gameContainer.position.y += shakeY;
             if (renderer.bgTiling) {
@@ -138,11 +146,10 @@ export class RenderSystem {
       }
     }
   
-    private renderEntities(world: World, renderer: PixiRenderer, entities: any, context: GameContext, gameTime: number, alpha: number): Set<number> {
-      const activeEids = new Set<number>();
+    private renderEntities(world: World, renderer: PixiRenderer, entities: QueryResult, context: GameContext, gameTime: number, alpha: number): void {
       for (let i = 0; i < entities.length; i++) {
         const eid = entities[i];
-        activeEids.add(eid);
+        this.activeEids.add(eid);
   
         let x = MathUtils.lerp(Position.prevX[eid], Position.x[eid], alpha);
         let y = MathUtils.lerp(Position.prevY[eid], Position.y[eid], alpha);
@@ -158,17 +165,17 @@ export class RenderSystem {
         let container = this.spriteMap.get(eid);
         const spriteId = Renderable.spriteId[eid];
   
-        if (container && (container as any).lastSpriteId !== spriteId) {
+        if (container && container.lastSpriteId !== spriteId) {
           if (!renderer.gameContainer.destroyed) {
             renderer.gameContainer.removeChild(container);
           }
-          PoolManager.containerPool.release(container as any);
+          PoolManager.containerPool.release(container);
           container = undefined;
         }
   
         if (!container) {
           container = PoolManager.containerPool.acquire();
-          (container as any).lastSpriteId = spriteId;
+          container.lastSpriteId = spriteId;
           
           switch (spriteId) {
             case SpriteId.DIRT_PATCH:
@@ -176,6 +183,9 @@ export class RenderSystem {
               break;
             case SpriteId.RAVINE:
               container.zIndex = -10;
+              break;
+            case SpriteId.WRECK:
+              container.zIndex = -6;
               break;
             case SpriteId.PARTICLE_BUBBLE:
               container.zIndex = -5;
@@ -206,16 +216,9 @@ export class RenderSystem {
           this.spriteMap.set(eid, container);
         } else {
           // Redraw "boiling" sprites periodically
-          const staticSprites = [
-            SpriteId.WALL, SpriteId.TREE, SpriteId.HOUSE, SpriteId.BROKEN_HOUSE,
-            SpriteId.RAVINE, SpriteId.DIRT_PATCH, SpriteId.COMIC_EFFECT, SpriteId.LOOT_CRATE
-          ];
-          const isBoiling = !staticSprites.includes(spriteId);
+          const isBoiling = !RenderSystem.STATIC_SPRITES.has(spriteId);
           // Handle warning marker scale uniquely
           if (spriteId === SpriteId.WARNING_MARKER && hasComponent(world, eid, WarningMarker)) {
-              const timer = WarningMarker.timer[eid];
-              const maxTimer = WarningMarker.maxTimer[eid];
-              const progress = timer / maxTimer;
               // The outer circle is static, we can shrink an inner circle by redrawing or we can just scale the whole thing.
               container.scale.set(1);
               SpriteBuilder.buildSprite(world, eid, spriteId, container);
@@ -275,9 +278,9 @@ export class RenderSystem {
                 
                 smearGraphics.beginPath();
                 for(let j=0; j<4; j++) {
-                    const offsetY = (Math.random() - 0.5) * 30; // spread of lines
-                    const startX = -Math.cos(localAngle) * (Math.random() * 10);
-                    const startY = offsetY - Math.sin(localAngle) * (Math.random() * 10);
+                    const offsetY = (RandomUtils.random() - 0.5) * 30; // spread of lines
+                    const startX = -Math.cos(localAngle) * (RandomUtils.random() * 10);
+                    const startY = offsetY - Math.sin(localAngle) * (RandomUtils.random() * 10);
                     smearGraphics.moveTo(startX, startY);
                     smearGraphics.lineTo(startX - Math.cos(localAngle) * smearLen, startY - Math.sin(localAngle) * smearLen);
                 }
@@ -389,9 +392,9 @@ export class RenderSystem {
             
             if (lifeRatio > 0.6) {
               container.alpha = 0.8;
-              if (Math.random() < 0.2) {
-                const offsetX = (Math.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
-                const offsetY = (Math.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
+              if (RandomUtils.random() < 0.2) {
+                const offsetX = (RandomUtils.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
+                const offsetY = (RandomUtils.random() - 0.5) * GameConfig.PARTICLE_OFFSET_RADIUS;
                 EffectFactory.spawnParticleBubble(world, container.x + offsetX, container.y + offsetY);
               }
             } else if (lifeRatio > 0.2) {
@@ -403,19 +406,21 @@ export class RenderSystem {
           }
   
           // Damage Flash & Gold Rush Tint
-          let targetTint = 0xffffff;
-          let baseAlpha = container.alpha;
+          let targetTint: number = GameConfig.DEFAULT_TINT;
+          let baseAlpha: number = GameConfig.DEFAULT_SPRITE_ALPHA;
           
-          if (hasComponent(world, eid, AIBehavior) && context.goldRushTimeLeft > 0) {
-              targetTint = 0xffd700;
+          if (hasComponent(world, eid, Wreck)) {
+              targetTint = GameConfig.WRECK_TINT;
+          } else if (hasComponent(world, eid, AIBehavior) && context.goldRushTimeLeft > 0) {
+              targetTint = GameConfig.GOLD_RUSH_TINT;
           }
   
           if (hasComponent(world, eid, PlayerControlled) && hasComponent(world, eid, PlayerBuffs)) {
               if (PlayerBuffs.invulnTimer[eid] > 0) {
-                  targetTint = 0x88bbff;
-                  baseAlpha = (this.frameCount % 8 < 4) ? 0.3 : 0.8;
-              } else {
-                  baseAlpha = 1.0;
+                  targetTint = GameConfig.INVULNERABILITY_TINT;
+                  baseAlpha = (this.frameCount % GameConfig.INVULNERABILITY_BLINK_CYCLE_FRAMES < GameConfig.INVULNERABILITY_BLINK_HALF_CYCLE_FRAMES)
+                      ? GameConfig.INVULNERABILITY_ALPHA_MIN
+                      : GameConfig.INVULNERABILITY_ALPHA_MAX;
               }
           }
   
@@ -436,22 +441,14 @@ export class RenderSystem {
               container.alpha = baseAlpha;
           }
   
-          const applyTint = (node: PIXI.Container) => {
-              if ('tint' in node) {
-                  const currentTint = (node as any).tint;
-                  if (currentTint !== targetTint) {
-                      (node as any).tint = targetTint;
-                  }
-              }
-              if (node.children) {
-                  for (let i = 0; i < node.children.length; i++) {
-                      applyTint(node.children[i] as PIXI.Container);
-                  }
-              }
-          };
-          applyTint(container);
+          // Optimally store the target tint in the component and apply once to the root container.
+          // Pixi 8 automatically cascades container.tint down to all children in the render pipeline,
+          // completely avoiding expensive recursive JS traversals over the scene graph.
+          Renderable.tint[eid] = targetTint;
+          if (container.tint !== targetTint) {
+              container.tint = targetTint;
+          }
       }
-      return activeEids;
     }
   
     private renderTelegraphLine(world: World, eid: number, container: PIXI.Container) {
@@ -594,7 +591,7 @@ export class RenderSystem {
           if (!renderer.gameContainer.destroyed) {
             renderer.gameContainer.removeChild(container);
           }
-          PoolManager.containerPool.release(container as any);
+          PoolManager.containerPool.release(container);
           this.spriteMap.delete(eid);
         }
       }

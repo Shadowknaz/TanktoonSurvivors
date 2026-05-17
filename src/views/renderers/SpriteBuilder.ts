@@ -1,7 +1,8 @@
 import * as PIXI from "pixi.js";
-import { SpriteId, ComicTextType } from "../../models/types";
+import { SpriteId } from "../../models/types";
 import { Wall, Tree, House, BrokenHouse, Ravine, MapDecal, ComicEffect, WarningMarker, LootDrop, Lifetime } from "../../ecs/components";
 import {  hasComponent , World } from "bitecs";
+import { RandomUtils } from "../../utils/RandomUtils";
 
 import { PoolManager } from "../../services/PoolManager";
 import { GameConfig } from "../../config/GameConfig";
@@ -9,7 +10,7 @@ import { en } from "../../localization/en";
 
 class SketchUtils {
   static jitter(amount: number) {
-    return (Math.random() - 0.5) * amount * 2;
+    return (RandomUtils.random() - 0.5) * amount * 2;
   }
 
   static drawSketchRect(
@@ -816,11 +817,11 @@ export class SpriteBuilder {
     sprite.beginPath();
     sprite.moveTo(-18, -8);
     for (let i = 0; i < 3; i++) {
-        sprite.lineTo(-18 - Math.random() * 14, -8 + SketchUtils.jitter(4));
+        sprite.lineTo(-18 - RandomUtils.random() * 14, -8 + SketchUtils.jitter(4));
     }
     sprite.moveTo(-18, 8);
     for (let i = 0; i < 3; i++) {
-        sprite.lineTo(-18 - Math.random() * 14, 8 + SketchUtils.jitter(4));
+        sprite.lineTo(-18 - RandomUtils.random() * 14, 8 + SketchUtils.jitter(4));
     }
     sprite.stroke({ width: 2, color: 0xffaa00, cap: "round" });
   }
@@ -855,7 +856,7 @@ export class SpriteBuilder {
     // Cross-hatching for texture
     sprite.beginPath();
     for (let a = 0; a < Math.PI * 2; a += 0.5) {
-      let len = Math.random() * r * 0.8;
+      let len = RandomUtils.random() * r * 0.8;
       sprite.moveTo(SketchUtils.jitter(2), SketchUtils.jitter(2));
       sprite.lineTo(Math.cos(a) * len + SketchUtils.jitter(2), Math.sin(a) * len + SketchUtils.jitter(2));
     }
@@ -881,7 +882,7 @@ export class SpriteBuilder {
     const rw = w / 2;
     const rh = h / 2;
     sprite.moveTo(-rw + 20, -rh + 20);
-    sprite.lineTo(-rw + Math.random() * 20 + 10, -rh + Math.random() * 20 + 10);
+    sprite.lineTo(-rw + RandomUtils.random() * 20 + 10, -rh + RandomUtils.random() * 20 + 10);
     sprite.stroke({ width: 2, color: 0x000000 });
 
     // A large burn mark
@@ -889,7 +890,7 @@ export class SpriteBuilder {
     
     // Debris
     for(let i=0; i<4; i++) {
-        sprite.rect(-rw + Math.random() * w, -rh + Math.random() * h, 10, 10);
+        sprite.rect(-rw + RandomUtils.random() * w, -rh + RandomUtils.random() * h, 10, 10);
         sprite.fill({ color: 0x888888 });
         sprite.stroke({ width: 1, color: 0x000000 });
     }
@@ -902,16 +903,16 @@ export class SpriteBuilder {
     // Jagged edges
     sprite.moveTo(-hw, -hh);
     for(let x = -hw; x <= hw; x += 30) {
-      sprite.lineTo(x + SketchUtils.jitter(10), -hh + Math.random() * 20);
+      sprite.lineTo(x + SketchUtils.jitter(10), -hh + RandomUtils.random() * 20);
     }
     for(let y = -hh; y <= hh; y += 30) {
-      sprite.lineTo(hw - Math.random() * 20, y + SketchUtils.jitter(10));
+      sprite.lineTo(hw - RandomUtils.random() * 20, y + SketchUtils.jitter(10));
     }
     for(let x = hw; x >= -hw; x -= 30) {
-      sprite.lineTo(x + SketchUtils.jitter(10), hh - Math.random() * 20);
+      sprite.lineTo(x + SketchUtils.jitter(10), hh - RandomUtils.random() * 20);
     }
     for(let y = hh; y >= -hh; y -= 30) {
-      sprite.lineTo(-hw + Math.random() * 20, y + SketchUtils.jitter(10));
+      sprite.lineTo(-hw + RandomUtils.random() * 20, y + SketchUtils.jitter(10));
     }
     sprite.closePath();
     sprite.fill({ color: 0x221100 });
@@ -930,7 +931,7 @@ export class SpriteBuilder {
     const segments = 12;
     for(let i=0; i<=segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
-        const r = Math.min(hw, hh) * 0.8 + Math.random() * Math.min(hw, hh) * 0.4;
+        const r = Math.min(hw, hh) * 0.8 + RandomUtils.random() * Math.min(hw, hh) * 0.4;
         const cx = Math.cos(theta) * r;
         const cy = Math.sin(theta) * r;
         if (i===0) sprite.moveTo(cx, cy);
@@ -943,10 +944,10 @@ export class SpriteBuilder {
     // Sketchy lines inside
     sprite.beginPath();
     for(let i=0; i<10; i++) {
-        const x = (Math.random() - 0.5) * w * 0.8;
-        const y = (Math.random() - 0.5) * h * 0.8;
+        const x = (RandomUtils.random() - 0.5) * w * 0.8;
+        const y = (RandomUtils.random() - 0.5) * h * 0.8;
         sprite.moveTo(x, y);
-        sprite.lineTo(x + 10 + Math.random()*20, y - 5 + Math.random()*10);
+        sprite.lineTo(x + 10 + RandomUtils.random()*20, y - 5 + RandomUtils.random()*10);
     }
     sprite.stroke({ width: 1.5, color: 0xa08f8a, alpha: 0.5 });
   }

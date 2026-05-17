@@ -1,17 +1,18 @@
 export class EventBus {
-  private static subscribers: Map<Function, Function[]> = new Map();
+  private subscribers: Map<Function, Function[]> = new Map();
 
-  static subscribe<T>(
+  subscribe<T>(
     eventType: new (...args: any[]) => T,
     handler: (event: T) => void,
-  ): void {
+  ): () => void {
     if (!this.subscribers.has(eventType)) {
       this.subscribers.set(eventType, []);
     }
     this.subscribers.get(eventType)!.push(handler);
+    return () => this.unsubscribe(eventType, handler);
   }
 
-  static unsubscribe<T>(
+  unsubscribe<T>(
     eventType: new (...args: any[]) => T,
     handler: (event: T) => void,
   ): void {
@@ -24,14 +25,14 @@ export class EventBus {
     }
   }
 
-  static publish<T>(event: T): void {
+  publish<T>(event: T): void {
     const eventType = (event as any).constructor;
     if (this.subscribers.has(eventType)) {
       this.subscribers.get(eventType)!.forEach((handler) => handler(event));
     }
   }
 
-  static clear(): void {
+  clear(): void {
     this.subscribers.clear();
   }
 }

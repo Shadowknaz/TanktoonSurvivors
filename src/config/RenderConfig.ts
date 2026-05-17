@@ -3,8 +3,6 @@ export const RenderConfig = {
   COLOR_BACKGROUND: 0xfdfbf7,
   HATCHING_DENSITY: 4, // pixels between lines
   CROSS_HATCHING_ANGLE_STEP: 45, // degrees
-  SCREEN_WIDTH: 1920,
-  SCREEN_HEIGHT: 1080,
 
   STEP_RATE: 1, // Full smooth visual update
   ENTITY_STEP_OFFSET: true, // staggered step updates

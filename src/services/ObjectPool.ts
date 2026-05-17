@@ -35,4 +35,12 @@ export class ObjectPool<T extends IPoolable> {
     this.pool.forEach((inst) => inst.destroy());
     this.pool = [];
   }
+
+  /**
+   * Destroys all instances currently sitting in the free-list and resets the pool
+   * to empty. Use during a world reset so pooled bodies are not re-used across worlds.
+   */
+  releaseAll(): void {
+    this.clear();
+  }
 }

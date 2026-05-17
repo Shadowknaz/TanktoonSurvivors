@@ -6,11 +6,16 @@ import { StatsUtils } from "../../utils/StatsUtils";
 
 export class UpgradeSystem {
     private pendingEvent: UpgradesChangedEvent | null = null;
+    private unsubscribe: () => void;
 
-    constructor() {
-        EventBus.subscribe(UpgradesChangedEvent, (event) => {
+    constructor(eventBus: EventBus) {
+        this.unsubscribe = eventBus.subscribe(UpgradesChangedEvent, (event) => {
             this.pendingEvent = event;
         });
+    }
+
+    destroy() {
+        this.unsubscribe();
     }
 
     update(world: World) {

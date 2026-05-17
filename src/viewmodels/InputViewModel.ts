@@ -1,4 +1,4 @@
-import { RenderConfig } from "../config/RenderConfig";
+import { GameConfig } from "../config/GameConfig";
 
 export interface InputState {
   moveLeft: boolean;
@@ -62,8 +62,8 @@ export class InputViewModel {
     const container = document.getElementById("game-container");
     if (container) {
       const rect = container.getBoundingClientRect();
-      const scaleX = RenderConfig.SCREEN_WIDTH / rect.width;
-      const scaleY = RenderConfig.SCREEN_HEIGHT / rect.height;
+      const scaleX = GameConfig.VIRTUAL_WIDTH / rect.width;
+      const scaleY = GameConfig.VIRTUAL_HEIGHT / rect.height;
       this.state.mousePosition = {
         x: (clientX - rect.left) * scaleX,
         y: (clientY - rect.top) * scaleY,
@@ -161,7 +161,7 @@ export class InputViewModel {
     }
   }
 
-  onTouchEnd(event: TouchEvent): void {
+  onTouchEnd(): void {
     this.state.isMouseDown = false;
     this.state.isShooting = false;
   }

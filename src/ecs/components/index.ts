@@ -12,7 +12,7 @@ export const Velocity = defineComponent({ x: Types.f32, y: Types.f32 });
 export const Health = defineComponent({ max: Types.f32, current: Types.f32 });
 
 // spriteId needs to be mapped as string parsing isn't native bitECS so we track by int maps
-export const Renderable = defineComponent({ spriteId: Types.ui32, visible: Types.ui8 });
+export const Renderable = defineComponent({ spriteId: Types.ui32, visible: Types.ui8, tint: Types.ui32 });
 
 // Link to Matter.js physics body map
 export const MatterBody = defineComponent({ bodyId: Types.ui32 });

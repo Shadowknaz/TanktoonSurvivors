@@ -1,3 +1,5 @@
+import { RandomUtils } from "./RandomUtils";
+
 export interface Rect {
   x: number;
   y: number;
@@ -27,7 +29,7 @@ export class BSPNode {
     // Minimum size for a split
     const MIN_SIZE = 300;
 
-    let splitH = Math.random() > 0.5;
+    let splitH = RandomUtils.random() > 0.5;
 
     // adjust split if too wide or tall
     if (this.w > this.h && this.w / this.h >= 1.25) splitH = false;
@@ -38,7 +40,7 @@ export class BSPNode {
       return; // Too small to split
     }
 
-    const splitPos = MIN_SIZE + Math.random() * (max - MIN_SIZE);
+    const splitPos = MIN_SIZE + RandomUtils.random() * (max - MIN_SIZE);
 
     if (splitH) {
       this.leftChild = new BSPNode(this.x, this.y, this.w, splitPos);
@@ -96,8 +98,6 @@ export class BSPMapGenerator {
     root.split(depth);
     root.createRooms();
 
-    const rooms = root.getRooms();
-
     // Instead of drawing rooms, let's say the space between rooms is the wall.
     // We can invert this. The entire area is filled with walls, and rooms carve it out.
     // For tank MVP, maybe we just want some rectangular blocks in the level.
@@ -110,19 +110,6 @@ export class BSPMapGenerator {
     walls.push({ x: width / 2, y: height + thick / 2, w: width, h: thick }); // Bottom
     walls.push({ x: -thick / 2, y: height / 2, w: thick, h: height }); // Left
     walls.push({ x: width + thick / 2, y: height / 2, w: thick, h: height }); // Right
-
-    // Add internal solid blocks by randomly creating blocks derived from the BSP leaves
-    const getLeaves = (node: BSPNode, leaves: BSPNode[] = []) => {
-      if (!node.leftChild && !node.rightChild) {
-        leaves.push(node);
-      } else {
-        if (node.leftChild) getLeaves(node.leftChild, leaves);
-        if (node.rightChild) getLeaves(node.rightChild, leaves);
-      }
-      return leaves;
-    };
-
-    const leaves = getLeaves(root);
 
     // Convert some borders between leaves into physical walls
     // Actually simpler: just place a solid block in the center of some rooms,

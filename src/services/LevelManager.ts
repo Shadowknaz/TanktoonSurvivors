@@ -1,13 +1,14 @@
-import { World, addEntity, addComponent } from "bitecs";
+import { World, addEntity, addComponent, deleteWorld, createWorld } from "bitecs";
 import { PhysicsEngine } from "./PhysicsEngine";
 import { MapGenerator } from "../utils/MapGenerator";
 import { GameConfig } from "../config/GameConfig";
 import { EnvironmentFactory } from "../ecs/factories/EnvironmentFactory";
 import { PlayerFactory } from "../ecs/factories/PlayerFactory";
 import { GameState, MapBounds } from "../ecs/components";
+import { PoolManager } from "./PoolManager";
 
 export class LevelManager {
-  static initLevel(world: World, physicsEngine: PhysicsEngine) {
+  static initLevel(world: World, physicsEngine: PhysicsEngine): void {
     // Initialize Global State Entity
     const globalEntity = addEntity(world);
     addComponent(world, globalEntity, GameState);
@@ -29,5 +30,22 @@ export class LevelManager {
       GameConfig.MAP_WIDTH / 2,
       GameConfig.MAP_HEIGHT / 2
     );
+  }
+
+  /**
+   * Soft-reset: clears all ECS entities and physics bodies,
+   * then re-initialises the level without destroying Pixi or Matter caches.
+   * Returns the new World instance (caller must update their reference).
+   */
+  static resetLevel(world: World, physicsEngine: PhysicsEngine): World {
+    // Return all pooled physics bodies before clearing the world
+    PoolManager.resetAllPools(physicsEngine);
+
+    // Destroy old world, create fresh one
+    deleteWorld(world);
+    const freshWorld = createWorld();
+
+    LevelManager.initLevel(freshWorld, physicsEngine);
+    return freshWorld;
   }
 }

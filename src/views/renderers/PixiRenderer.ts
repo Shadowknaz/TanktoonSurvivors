@@ -145,7 +145,7 @@ export class PixiRenderer {
   private doDestroy() {
     if (this.resizeListener) {
       window.removeEventListener('resize', this.resizeListener);
-      this.resizeListener = null;
+      this.resizeListener = undefined;
     }
     if (this.app) {
       const hasCanvas = !!this.app.canvas;

@@ -7,3 +7,6 @@ export class UpgradesChangedEvent {
     public inventory: InventoryItem[]
   ) {}
 }
+
+/** Fired by UI "Try Again" — `GameApp` listens and orchestrates the world reset. */
+export class ResetLevelEvent {}

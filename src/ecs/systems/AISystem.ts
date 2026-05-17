@@ -30,14 +30,20 @@ import { AIState } from "../../models/types";
 import { CollisionSystem } from "./CollisionSystem";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { RandomUtils } from "../../utils/RandomUtils";
+import { EnemyIndex } from "../../services/EnemyIndex";
 
 export class AISystem {
-  private enemyGrid: SpatialGrid;
+  private enemyIndex: EnemyIndex;
   private obstacleGrid: SpatialGrid;
   private obstaclesInitialized = false;
+  private nearbyEnemies: number[] = [];
+  private nearbyObs: number[] = [];
+  private sepResult = { x: 0, y: 0 };
+  private avoidResult = { x: 0, y: 0 };
+  private moveResult = { x: 0, y: 0 };
 
-  constructor() {
-    this.enemyGrid = new SpatialGrid(GameConfig.MAP_WIDTH, GameConfig.MAP_HEIGHT, GameConfig.AI_SPATIAL_GRID_ENEMY_CELL);
+  constructor(enemyIndex: EnemyIndex) {
+    this.enemyIndex = enemyIndex;
     this.obstacleGrid = new SpatialGrid(GameConfig.MAP_WIDTH, GameConfig.MAP_HEIGHT, GameConfig.AI_SPATIAL_GRID_OBSTACLE_CELL);
   }
 
@@ -68,8 +74,6 @@ export class AISystem {
     const enemies = query(world, [AIBehavior, Position, Velocity]);
     const burrowedEnemies = query(world, [Burrowed, Position]);
     const flamerEnemies = query(world, [FlamerTank, Position]);
-
-    this.updateSpatialGrids(enemies);
     
     // Burrowed logic
     for (let i = 0; i < burrowedEnemies.length; i++) {
@@ -116,14 +120,16 @@ export class AISystem {
         }
     }
 
-    const nearbyEnemies: number[] = [];
-    const nearbyObs: number[] = [];
-
     for (let i = 0; i < enemies.length; i++) {
         const eid = enemies[i];
         
-        const { sepX, sepY } = this.calculateSeparation(eid, nearbyEnemies);
-        const { avoidX, avoidY } = this.calculateAvoidance(world, eid, nearbyObs);
+        const sep = this.calculateSeparation(eid, this.nearbyEnemies);
+        const sepX = sep.x;
+        const sepY = sep.y;
+
+        const avoid = this.calculateAvoidance(world, eid, this.nearbyObs);
+        const avoidX = avoid.x;
+        const avoidY = avoid.y;
 
         const dx = Position.x[playerEid] - Position.x[eid];
         const dy = Position.y[playerEid] - Position.y[eid];
@@ -138,7 +144,9 @@ export class AISystem {
         currentState = this.updateAIState(world, eid, currentState, dist, hpRatio, isKamikaze, dt, gameTime);
         AIBehavior.state[eid] = currentState;
 
-        const { moveX, moveY } = this.calculateMovement(eid, currentState, dist, dx, dy, isRammer, isKamikaze);
+        const move = this.calculateMovement(eid, currentState, dist, dx, dy, isRammer, isKamikaze);
+        const moveX = move.x;
+        const moveY = move.y;
         
         this.applyMovement(eid, moveX, moveY, sepX, sepY, avoidX, avoidY, dt);
 
@@ -161,18 +169,10 @@ export class AISystem {
       }
   }
 
-  private updateSpatialGrids(enemies: any) {
-      this.enemyGrid.clear();
-      for (let i = 0; i < enemies.length; i++) {
-          const eid = enemies[i];
-          this.enemyGrid.insert(eid, Position.x[eid], Position.y[eid]);
-      }
-  }
-
-  private calculateSeparation(eid: number, nearbyEnemies: number[]): { sepX: number, sepY: number } {
+  private calculateSeparation(eid: number, nearbyEnemies: number[]) {
       let sepX = 0;
       let sepY = 0;
-      this.enemyGrid.queryNearby(Position.x[eid], Position.y[eid], GameConfig.AI_SEPARATION_RADIUS, nearbyEnemies);
+      this.enemyIndex.getGrid().queryNearby(Position.x[eid], Position.y[eid], GameConfig.AI_SEPARATION_RADIUS, nearbyEnemies);
       for (let j = 0; j < nearbyEnemies.length; j++) {
         const other = nearbyEnemies[j];
         if (eid === other) continue;
@@ -184,10 +184,12 @@ export class AISystem {
           sepY += oy / odist;
         }
       }
-      return { sepX, sepY };
+      this.sepResult.x = sepX;
+      this.sepResult.y = sepY;
+      return this.sepResult;
   }
 
-  private calculateAvoidance(world: World, eid: number, nearbyObs: number[]): { avoidX: number, avoidY: number } {
+  private calculateAvoidance(world: World, eid: number, nearbyObs: number[]) {
       let avoidX = 0;
       let avoidY = 0;
       this.obstacleGrid.queryNearby(Position.x[eid], Position.y[eid], GameConfig.AI_OBSTACLE_AVOID_RADIUS, nearbyObs);
@@ -203,7 +205,9 @@ export class AISystem {
            avoidY += (oy / odist) * (safeDist - odist) * 0.1;
         }
       }
-      return { avoidX, avoidY };
+      this.avoidResult.x = avoidX;
+      this.avoidResult.y = avoidY;
+      return this.avoidResult;
   }
 
   private updateAIState(world: World, eid: number, currentState: number, dist: number, hpRatio: number, isKamikaze: boolean, dt: number, timeNow: number): number {
@@ -249,7 +253,7 @@ export class AISystem {
     return currentState;
   }
 
-  private calculateMovement(eid: number, currentState: number, dist: number, dx: number, dy: number, isRammer: boolean, isKamikaze: boolean): { moveX: number, moveY: number } {
+  private calculateMovement(eid: number, currentState: number, dist: number, dx: number, dy: number, isRammer: boolean, isKamikaze: boolean) {
     let moveX = 0;
     let moveY = 0;
 
@@ -289,7 +293,9 @@ export class AISystem {
         case AIState.AGONY:
             break;
     }
-    return { moveX: dist > 0 ? moveX : 0, moveY: dist > 0 ? moveY : 0 };
+    this.moveResult.x = dist > 0 ? moveX : 0;
+    this.moveResult.y = dist > 0 ? moveY : 0;
+    return this.moveResult;
   }
 
   private applyMovement(eid: number, moveX: number, moveY: number, sepX: number, sepY: number, avoidX: number, avoidY: number, dt: number) {
@@ -320,3 +326,4 @@ export class AISystem {
   }
 
 }
+

@@ -1,3 +1,5 @@
+import { RandomUtils } from "./RandomUtils";
+
 export class CellularAutomata {
     /**
      * Generates a 2D boolean grid using a simple Cellular Automata algorithm.
@@ -8,7 +10,7 @@ export class CellularAutomata {
         
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                grid[y][x] = Math.random() < fillProb;
+                grid[y][x] = RandomUtils.random() < fillProb;
             }
         }
 

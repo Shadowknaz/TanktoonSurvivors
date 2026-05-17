@@ -3,8 +3,8 @@ import { Joystick } from './Joystick';
 import { useGameStore } from '../../stores/GameStore';
 import { MobileConfig } from '../../config/MobileConfig';
 
-export const MobileControls: React.FC = () => {
-  const { inputViewModel } = useGameStore();
+export const MobileControls: React.FC = React.memo(() => {
+  const inputViewModel = useGameStore(s => s.inputViewModel);
 
   if (!inputViewModel) return null;
 
@@ -44,4 +44,7 @@ export const MobileControls: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+MobileControls.displayName = 'MobileControls';
+

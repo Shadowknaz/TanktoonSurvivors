@@ -17,7 +17,6 @@ import {
   PlayerControlled,
   ContactDamage,
   Explosive,
-  AIBehavior,
   AutoWeapon,
   Pierce,
   ArcedProjectile,
@@ -29,15 +28,103 @@ import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
 import { OwnerType, SpriteId } from "../../models/types";
 import { GameConfig } from "../../config/GameConfig";
-import { MathUtils } from "../../utils/MathUtils";
-import { PoolManager } from "../../services/PoolManager";
+import { PoolManager, PooledBody } from "../../services/PoolManager";
 import { EffectFactory } from "../factories/EffectFactory";
 import Matter from "matter-js";
 import { GameContext } from "../../models/GameContext";
+import { EnemyIndex } from "../../services/EnemyIndex";
+
+/** Snapshot of per-frame shooter stats, read from ECS components into pre-allocated buffers to avoid GC pressure. */
+interface StatsSnapshot {
+  damage: number;
+  explosiveRadius: number;
+  pierceCount: number;
+  hasAutoGun: number;
+  multishotCount: number;
+  fireRateMultiplier: number;
+  hasAutoVolley: number;
+  projectileSizeMult: number;
+  knockbackForce: number;
+  chainCount: number;
+  hasSeismic: number;
+  hasStasis: number;
+  hasNapalmMinigun: number;
+}
 
 export class WeaponSystem {
+  private enemyIndex: EnemyIndex;
+
+  constructor(enemyIndex: EnemyIndex) {
+    this.enemyIndex = enemyIndex;
+  }
+
+  private playerStatsBuffer: StatsSnapshot = {
+      damage: 0,
+      explosiveRadius: 0,
+      pierceCount: 0,
+      hasAutoGun: 0,
+      multishotCount: 0,
+      fireRateMultiplier: 1.0,
+      hasAutoVolley: 0,
+      projectileSizeMult: 0,
+      knockbackForce: 0,
+      chainCount: 0,
+      hasSeismic: 0,
+      hasStasis: 0,
+      hasNapalmMinigun: 0
+  };
+
+  private enemyStatsBuffer: StatsSnapshot = {
+      damage: 0,
+      explosiveRadius: 0,
+      pierceCount: 0,
+      hasAutoGun: 0,
+      multishotCount: 0,
+      fireRateMultiplier: 1.0,
+      hasAutoVolley: 0,
+      projectileSizeMult: 0,
+      knockbackForce: 0,
+      chainCount: 0,
+      hasSeismic: 0,
+      hasStasis: 0,
+      hasNapalmMinigun: 0
+  };
+
+  private autoStatsBuffer: StatsSnapshot = {
+      damage: 0,
+      explosiveRadius: 0,
+      pierceCount: 0,
+      hasAutoGun: 0,
+      multishotCount: 0,
+      fireRateMultiplier: 1.0,
+      hasAutoVolley: 0,
+      projectileSizeMult: 0,
+      knockbackForce: 0,
+      chainCount: 0,
+      hasSeismic: 0,
+      hasStasis: 0,
+      hasNapalmMinigun: 0
+  };
+
+  private matterPosBuffer = { x: 0, y: 0 };
+
+  private copyStats(src: StatsSnapshot, dest: StatsSnapshot): void {
+    dest.damage = src.damage;
+    dest.explosiveRadius = src.explosiveRadius;
+    dest.pierceCount = src.pierceCount;
+    dest.hasAutoGun = src.hasAutoGun;
+    dest.multishotCount = src.multishotCount;
+    dest.fireRateMultiplier = src.fireRateMultiplier;
+    dest.hasAutoVolley = src.hasAutoVolley;
+    dest.projectileSizeMult = src.projectileSizeMult;
+    dest.knockbackForce = src.knockbackForce;
+    dest.chainCount = src.chainCount;
+    dest.hasSeismic = src.hasSeismic;
+    dest.hasStasis = src.hasStasis;
+    dest.hasNapalmMinigun = src.hasNapalmMinigun;
+  }
   
-  private createProjectile(world: World, physicsEngine: PhysicsEngine, shooterId: number, px: number, py: number, angle: number, isPlayer: boolean, stats: any, offset: number) {
+  private createProjectile(world: World, physicsEngine: PhysicsEngine, shooterId: number, px: number, py: number, angle: number, isPlayer: boolean, stats: StatsSnapshot, offset: number): void {
     // bitECS addEntity automatically uses an internal pool of recycled IDs.
     // We do not need a custom Entity wrapper pool, as bitECS handles this efficiently without allocating memory.
     const projEid = addEntity(world);
@@ -98,14 +185,16 @@ export class WeaponSystem {
 
     // Use ObjectPool from PoolManager for Matter.js bodies
     const body = PoolManager.projectileBodyPool.acquire();
-    Matter.Body.setPosition(body, { x: Position.x[projEid], y: Position.y[projEid] });
+    this.matterPosBuffer.x = Position.x[projEid];
+    this.matterPosBuffer.y = Position.y[projEid];
+    Matter.Body.setPosition(body, this.matterPosBuffer);
     Matter.Body.setAngle(body, 0);
     
     const sizeMult = 1.0 + (stats?.projectileSizeMult || 0);
     Projectile.scale[projEid] = sizeMult;
     if (sizeMult !== 1.0) {
         Matter.Body.scale(body, sizeMult, sizeMult);
-        (body as any).currentScale = sizeMult;
+        body.currentScale = sizeMult;
     }
 
     // Add explicitly to world if not already in it (Matter behaves better if we re-add or keep it)
@@ -131,7 +220,7 @@ export class WeaponSystem {
     Renderable.visible[projEid] = 1;
   }
 
-  update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, context: GameContext) {
+  update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, _context: GameContext) {
     const gameStateEntities = query(world, [GameState]);
     if (gameStateEntities.length === 0) return;
     const gs = gameStateEntities[0];
@@ -143,30 +232,42 @@ export class WeaponSystem {
       const eid = shooters[i];
 
       const isPlayer = hasComponent(world, eid, PlayerControlled);
-      const enemyStats = { damage: Weapon.damage[eid] || GameConfig.PROJECTILE_DAMAGE_ENEMY };
       
-      let stats: any;
+      let stats: StatsSnapshot;
       if (isPlayer) {
-          stats = {
-              damage: PlayerStats.damage[eid],
-              explosiveRadius: PlayerStats.explosiveRadius[eid],
-              pierceCount: PlayerStats.pierceCount[eid],
-              hasAutoGun: PlayerStats.hasAutoGun[eid],
-              multishotCount: PlayerStats.multishotCount[eid],
-              fireRateMultiplier: PlayerStats.fireRateMultiplier[eid],
-              hasAutoVolley: PlayerStats.hasAutoVolley[eid],
-              projectileSizeMult: PlayerStats.projectileSizeMult[eid],
-              knockbackForce: PlayerStats.knockbackForce[eid],
-              chainCount: PlayerStats.chainCount[eid],
-              hasSeismic: PlayerStats.hasSeismic[eid],
-              hasStasis: PlayerStats.hasStasis[eid]
-          };
+          this.playerStatsBuffer.damage = PlayerStats.damage[eid];
+          this.playerStatsBuffer.explosiveRadius = PlayerStats.explosiveRadius[eid];
+          this.playerStatsBuffer.pierceCount = PlayerStats.pierceCount[eid];
+          this.playerStatsBuffer.hasAutoGun = PlayerStats.hasAutoGun[eid];
+          this.playerStatsBuffer.multishotCount = PlayerStats.multishotCount[eid];
+          this.playerStatsBuffer.fireRateMultiplier = PlayerStats.fireRateMultiplier[eid];
+          this.playerStatsBuffer.hasAutoVolley = PlayerStats.hasAutoVolley[eid];
+          this.playerStatsBuffer.projectileSizeMult = PlayerStats.projectileSizeMult[eid];
+          this.playerStatsBuffer.knockbackForce = PlayerStats.knockbackForce[eid];
+          this.playerStatsBuffer.chainCount = PlayerStats.chainCount[eid];
+          this.playerStatsBuffer.hasSeismic = PlayerStats.hasSeismic[eid];
+          this.playerStatsBuffer.hasStasis = PlayerStats.hasStasis[eid];
+          this.playerStatsBuffer.hasNapalmMinigun = PlayerStats.hasNapalmMinigun[eid];
+          stats = this.playerStatsBuffer;
       } else {
-          stats = enemyStats;
+          this.enemyStatsBuffer.damage = Weapon.damage[eid] || GameConfig.PROJECTILE_DAMAGE_ENEMY;
+          this.enemyStatsBuffer.explosiveRadius = 0;
+          this.enemyStatsBuffer.pierceCount = 0;
+          this.enemyStatsBuffer.hasAutoGun = 0;
+          this.enemyStatsBuffer.multishotCount = 0;
+          this.enemyStatsBuffer.fireRateMultiplier = 1.0;
+          this.enemyStatsBuffer.hasAutoVolley = 0;
+          this.enemyStatsBuffer.projectileSizeMult = 0;
+          this.enemyStatsBuffer.knockbackForce = 0;
+          this.enemyStatsBuffer.chainCount = 0;
+          this.enemyStatsBuffer.hasSeismic = 0;
+          this.enemyStatsBuffer.hasStasis = 0;
+          this.enemyStatsBuffer.hasNapalmMinigun = 0;
+          stats = this.enemyStatsBuffer;
       }
 
-      // Ensure Player has AutoWeapon if they grabbed the upgrade
-      if (isPlayer && stats?.hasAutoGun && !hasComponent(world, eid, AutoWeapon)) {
+      // Ensure Player has AutoWeapon if they grabbed the upgrade or synergy
+      if (isPlayer && (stats?.hasAutoGun || stats?.hasNapalmMinigun) && !hasComponent(world, eid, AutoWeapon)) {
           addComponent(world, eid, AutoWeapon);
           AutoWeapon.lastFired[eid] = gameTime;
           AutoWeapon.cooldown[eid] = GameConfig.AUTO_GUN_COOLDOWN_MS / 1000;
@@ -180,37 +281,40 @@ export class WeaponSystem {
           let currentCooldown = AutoWeapon.cooldown[eid];
           let shotsToFire = 1;
 
-          if (isPlayer && stats?.hasAutoVolley) {
-              currentCooldown *= GameConfig.SYNERGY_AUTO_VOLLEY_COOLDOWN_MULT;
-              shotsToFire = GameConfig.SYNERGY_AUTO_VOLLEY_SHOTS;
+          if (isPlayer) {
+              // Apply player fire rate multiplier
+              currentCooldown /= stats.fireRateMultiplier;
+
+              if (stats.hasNapalmMinigun) {
+                  currentCooldown *= GameConfig.SYNERGY_NAPALM_MINIGUN_COOLDOWN_MULT;
+              }
+              if (stats.hasAutoVolley) {
+                  currentCooldown *= GameConfig.SYNERGY_AUTO_VOLLEY_COOLDOWN_MULT;
+                  shotsToFire = GameConfig.SYNERGY_AUTO_VOLLEY_SHOTS;
+              }
           }
 
           if (gameTime - AutoWeapon.lastFired[eid] >= currentCooldown) {
-              // Find nearest enemy
+              // Find nearest enemy using spatial grid index
               const px = Position.x[eid];
               const py = Position.y[eid];
-              let nearestDist = AutoWeapon.range[eid];
+              const range = AutoWeapon.range[eid];
+              const nearestEnemy = this.enemyIndex.getNearestEnemy(px, py, range);
               let nearestAngle = null;
 
-              const enemies = query(world, [AIBehavior, Position]);
-              for (let e = 0; e < enemies.length; e++) {
-                  const enemyId = enemies[e];
-                  const ex = Position.x[enemyId];
-                  const ey = Position.y[enemyId];
-                  const dist = Math.hypot(ex - px, ey - py);
-                  if (dist < nearestDist) {
-                      nearestDist = dist;
-                      nearestAngle = Math.atan2(ey - py, ex - px);
-                  }
+              if (nearestEnemy !== -1) {
+                  nearestAngle = Math.atan2(Position.y[nearestEnemy] - py, Position.x[nearestEnemy] - px);
               }
 
               if (nearestAngle !== null) {
                   AutoWeapon.lastFired[eid] = gameTime;
-                  const autoStats = { ...stats, damage: AutoWeapon.damage[eid], explosiveRadius: 0 };
+                  this.copyStats(stats, this.autoStatsBuffer);
+                  this.autoStatsBuffer.damage = AutoWeapon.damage[eid];
+                  this.autoStatsBuffer.explosiveRadius = stats?.hasNapalmMinigun ? (stats.explosiveRadius || GameConfig.UPGRADE_EXPLOSIVE_RADIUS) : 0;
                   
                   for (let s = 0; s < shotsToFire; s++) {
                       const curAngle = nearestAngle + (s - (shotsToFire - 1) / 2) * GameConfig.CLUSTER_SPREAD_ANGLE;
-                      this.createProjectile(world, physicsEngine, eid, px, py, curAngle, true, autoStats, AutoWeapon.muzzleOffset[eid]);
+                      this.createProjectile(world, physicsEngine, eid, px, py, curAngle, true, this.autoStatsBuffer, AutoWeapon.muzzleOffset[eid]);
                   }
               }
           }
@@ -258,7 +362,8 @@ export class WeaponSystem {
             if (body) {
               if (hasComponent(world, eid, Projectile) && PoolManager.projectileBodyPool) {
                  physicsEngine.removeBody(body);
-                 PoolManager.projectileBodyPool.release(body as any);
+                 // Safe cast: every body in projectileBodyPool is a PooledBody — reset/destroy assigned in initPhysicsPools.
+                 PoolManager.projectileBodyPool.release(body as PooledBody);
               } else {
                  physicsEngine.removeBody(body);
               }

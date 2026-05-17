@@ -15,7 +15,7 @@ export class EffectFactory {
     Position.angle[eid] = angle;
 
     addComponent(world, eid, Renderable);
-    Renderable.spriteId[eid] = originalSpriteId; // Use original sprite, but render system will draw it darkened
+    Renderable.spriteId[eid] = SpriteId.WRECK;
     Renderable.visible[eid] = 1;
 
     addComponent(world, eid, Lifetime);

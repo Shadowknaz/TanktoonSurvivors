@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { GameConfig } from "../config/GameConfig";
 import { UpgradeId, UPGRADE_OPTIONS, UpgradeOption } from "../config/Upgrades";
 import { RandomUtils } from "../utils/RandomUtils";
 import { GameState } from "../models/types";
@@ -61,6 +60,7 @@ interface GameStore {
   timeScaleDuration: number;
   // playerStats removed, managed by ECS PlayerStats component
   inputViewModel: InputViewModel | null;
+  eventBus: EventBus | null;
 
   // Derived getters
   isGameOver: () => boolean;
@@ -89,6 +89,7 @@ interface GameStore {
   setFps: (fps: number) => void;
   setInputViewModel: (input: InputViewModel) => void;
   addItemToInventory: (itemId: string, amount?: number) => void;
+  setEventBus: (eventBus: EventBus | null) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -122,6 +123,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   timeScaleDuration: 0,
   // playerStats removed
   inputViewModel: null,
+  eventBus: null,
 
   isGameOver: () => get().gameState === GameState.GAME_OVER,
   isLevelingUp: () => get().gameState === GameState.LEVEL_UP,
@@ -143,7 +145,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set((state) => ({ selectedPerks: [...state.selectedPerks, perk] })),
   upgradeWeapon: () => set((state) => ({ weaponLevel: state.weaponLevel + 1 })),
   resetSession: () => set(() => {
-      EventBus.publish(new UpgradesChangedEvent([], []));
+      const eventBus = get().eventBus;
+      if (eventBus) {
+          eventBus.publish(new UpgradesChangedEvent([], []));
+      }
       return {
           gameState: GameState.PLAYING,
           score: 0,
@@ -211,9 +216,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return { playerExp: newExp, gameState: newGameState, currentLevelUpOptions: newOptions };
   }),
   endLevelUp: (chosenUpgrade) => set((state) => {
-      let hp = state.playerHealth;
-      let maxHp = state.playerMaxHealth;
-      
       let acquired = [...state.acquiredUpgrades];
       const existingIndex = acquired.findIndex(u => u.option.id === chosenUpgrade);
       
@@ -258,7 +260,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
           inventory: updatedInventory,
       };
       
-      EventBus.publish(new UpgradesChangedEvent(updatedAcquired, updatedInventory));
+      const eventBus = get().eventBus;
+      if (eventBus) {
+          eventBus.publish(new UpgradesChangedEvent(updatedAcquired, updatedInventory));
+      }
       
       return newState;
   }),
@@ -274,9 +279,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
           newInventory = [...state.inventory, { id: itemId, name: itemId, quantity: amount }];
       }
       
-      EventBus.publish(new UpgradesChangedEvent(state.acquiredUpgrades, newInventory));
+      const eventBus = get().eventBus;
+      if (eventBus) {
+          eventBus.publish(new UpgradesChangedEvent(state.acquiredUpgrades, newInventory));
+      }
       
       return { inventory: newInventory };
   }),
-  setInputViewModel: (inputViewModel) => set({ inputViewModel })
+  setInputViewModel: (inputViewModel) => set({ inputViewModel }),
+  setEventBus: (eventBus) => set({ eventBus })
 }));

@@ -17,8 +17,7 @@ import {
 } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
-import { EnemyTemplate, EnemyType } from "../../config/EnemyConfig";
-import { SpriteId } from "../../models/types";
+import { EnemyTemplate } from "../../config/EnemyConfig";
 
 export class EnemyFactory {
   static createEnemy(

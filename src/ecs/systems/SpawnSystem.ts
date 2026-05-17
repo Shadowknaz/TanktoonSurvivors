@@ -1,10 +1,8 @@
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import {  query , World } from "bitecs";
 import { Position, PlayerControlled, AIBehavior, GameState } from "../components";
-import { MathUtils } from "../../utils/MathUtils";
 import { MapUtils } from "../../utils/MapUtils";
 import { GameConfig } from "../../config/GameConfig";
-import { RenderConfig } from "../../config/RenderConfig";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { ENEMY_SPAWN_POOL } from "../../config/EnemySpawnConfig";
 import { GameContext } from "../../models/GameContext";

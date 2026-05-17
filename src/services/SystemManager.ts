@@ -13,22 +13,39 @@ import { WeaponSystem } from "../ecs/systems/WeaponSystem";
 import { CollisionSystem } from "../ecs/systems/CollisionSystem";
 import { EventSystem } from "../ecs/systems/EventSystem";
 import { UpgradeSystem } from "../ecs/systems/UpgradeSystem";
+import { EventBus } from "../core/EventBus";
+import { EnemyIndex } from "./EnemyIndex";
 
 export class SystemManager {
+  private enemyIndex = new EnemyIndex();
   private inputSystem = new InputSystem();
   private physicsSyncSystem = new PhysicsSyncSystem();
   private renderSystem = new RenderSystem();
-  private aiSystem = new AISystem();
+  private aiSystem: AISystem;
   private spawnSystem = new SpawnSystem();
-  private weaponSystem = new WeaponSystem();
-  private collisionSystem = new CollisionSystem();
-  private eventSystem = new EventSystem();
-  private upgradeSystem = new UpgradeSystem();
+  private weaponSystem: WeaponSystem;
+  private collisionSystem: CollisionSystem;
+  private eventSystem: EventSystem;
+  private upgradeSystem: UpgradeSystem;
+
+  constructor(eventBus: EventBus) {
+    this.aiSystem = new AISystem(this.enemyIndex);
+    this.weaponSystem = new WeaponSystem(this.enemyIndex);
+    this.collisionSystem = new CollisionSystem(this.enemyIndex);
+    this.eventSystem = new EventSystem(this.enemyIndex);
+    this.upgradeSystem = new UpgradeSystem(eventBus);
+  }
+
+  destroy() {
+    this.upgradeSystem.destroy();
+  }
 
   update(world: World, physicsEngine: PhysicsEngine, inputViewModel: InputViewModel, pixiRenderer: PixiRenderer, deltaTime: number, context: GameContext, alpha: number) {
     const isPaused = context.isLevelingUp || context.isGameOver || context.isMenu;
 
     if (!isPaused) {
+      this.enemyIndex.update(world);
+
       this.upgradeSystem.update(world);
       this.eventSystem.update(world, physicsEngine, deltaTime, context);
       this.spawnSystem.update(world, physicsEngine, deltaTime, context);

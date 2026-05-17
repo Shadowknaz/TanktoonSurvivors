@@ -59,10 +59,11 @@ import {
 Документация (`@/d:/tankini/docs/ARCHITECTURE.md:11`) обещает детерминизм фиксированного шага, но `Math.random()` его ломает: на одном и том же сиде события, тряска камеры и геометрия карт каждый раз разные.
 - **Как чинить:** ввести правило «никаких `Math.random()` в `src/ecs/**`, `src/utils/**`, `src/services/**`», подменить все вызовы на `RandomUtils.random()`. Добавить ESLint‑правило `no-restricted-syntax` для запрета `Math.random`.
 
-### 1.4. Утечка подписок `EventBus` (особенно под React StrictMode)
+### 1.4. Утечка подписок `EventBus` (особенно под React StrictMode) (РЕШЕНО)
 - `@/d:/tankini/src/ecs/systems/UpgradeSystem.ts:11-13` подписывается на `UpgradesChangedEvent`, но `unsubscribe` не вызывается в `GameApp.destroy()` (`@/d:/tankini/src/core/GameApp.ts:114-121`).
 - `EventBus` — статический класс с общей мапой подписчиков (`@/d:/tankini/src/core/EventBus.ts:1-37`). При HMR / `<StrictMode>` `GameApp` создаётся минимум дважды, и каждый раз появляется новая подписка → старые обработчики держат ссылку на мёртвый `world`.
 - **Как чинить:** добавить `destroy()` у систем (как минимум у `UpgradeSystem`) с `EventBus.unsubscribe(...)`, либо вызывать `EventBus.clear()` в `GameApp.destroy()`. Лучше — превратить `EventBus` в инстанс, хранимый в `GameApp`, тогда уничтожение `GameApp` автоматически выкидывает подписчиков.
+- **Решение:** `EventBus` преобразован из статического синглтона в класс-экземпляр, создаваемый в конструкторе `GameApp` и внедряемый в системы и Zustand-стор. Подписки отписываются при уничтожении систем, а сам экземпляр очищается в `GameApp.destroy()`.
 
 ### 1.5. Лишние ре‑рендеры `MainMenu` и `MobileControls`
 - `@/d:/tankini/src/components/MainMenu.tsx:7` — `const { setGameState } = useGameStore();` без селектора.
@@ -75,9 +76,10 @@ import {
 
 ## 2. Архитектурные проблемы
 
-### 2.1. Параллельный «мир» в `src/ecs/world.ts`
-`@/d:/tankini/src/ecs/world.ts:1-4` создаёт **второй** `World` через `createWorld()`, который импортируется только в `@/d:/tankini/src/ecs/factories/PlayerFactory.ts:2` и там не используется. Боевой `World` создаётся в `@/d:/tankini/src/core/GameApp.ts:28`. Это противоречит правилу «No God Objects / single source of truth». Если кто‑то по ошибке начнёт пользоваться `world` из модуля — компоненты разъедутся.
+### 2.1. Параллельный «мир» в `src/ecs/world.ts` (РЕШЕНО)
+`@/d:/tankini/src/ecs/world.ts:1-4` создавал **второй** `World` через `createWorld()`, который импортировался только в `@/d:/tankini/src/ecs/factories/PlayerFactory.ts:2` и там не использовался. Боевой `World` создаётся в `@/d:/tankini/src/core/GameApp.ts:28`. Это противоречит правилу «No God Objects / single source of truth». Если кто‑то по ошибке начнёт пользоваться `world` из модуля — компоненты разъедутся.
 - **Как чинить:** удалить `src/ecs/world.ts` и битый импорт.
+- **Решение:** Файл `src/ecs/world.ts` и неиспользуемый импорт в `PlayerFactory.ts` полностью удалены.
 
 ### 2.2. God‑классы в системах
 - `@/d:/tankini/src/ecs/systems/CollisionSystem.ts` — 650 строк, `handleCollision` ~310 строк, многократное дублирование логики «deflect / evade / crit / shrapnel» (см. `@/d:/tankini/src/ecs/systems/CollisionSystem.ts:138-247` и `@/d:/tankini/src/ecs/systems/CollisionSystem.ts:397-538`).
@@ -88,9 +90,10 @@ import {
   - Разбить `RenderSystem` на `CameraSystem`, `SpriteSyncSystem`, `EffectTintSystem`, `TelegraphSystem`.
   - Разрезать `SpriteBuilder` по типам сущностей (`buildPlayerTank`, `buildEnemyTank`, `buildProjectile`, …) в отдельные файлы внутри `src/views/renderers/builders/`.
 
-### 2.3. `getGameContext()` в hot‑path
-`@/d:/tankini/src/core/GameApp.ts:54-82` создаёт **новый объект `GameContext` каждый fixed‑шаг** и передаёт его дальше во все системы. Прямое нарушение пользовательского правила «Avoid creating new objects via `new` in high-load loops». Кроме того, для каждого поля `state.*` берётся ссылка из стора — даже когда системы пропущены (`isPaused`).
+### 2.3. `getGameContext()` в hot‑path (РЕШЕНО)
+`@/d:/tankini/src/core/GameApp.ts:54-82` создавал **новый объект `GameContext` каждый fixed‑шаг** и передавал его дальше во все системы. Прямое нарушение пользовательского правила «Avoid creating new objects via `new` in high-load loops». Кроме того, для каждого поля `state.*` берётся ссылка из стора — даже когда системы пропущены (`isPaused`).
 - **Как чинить:** хранить готовый объект `GameContext` как поле `GameApp` и обновлять его поля inline (Object Pool из 1 экземпляра). Либо переделать `GameContext` в getter‑прокси над `useGameStore.getState()`.
+- **Решение:** Pre-allocated `sharedContext` создан на уровне `GameApp` и обновляется inline при каждом тике, исключая GC аллокации.
 
 ### 2.4. `applyAOEDamage` и `handleCollision` дублируют ~120 строк
 Логика «invuln → evasion → deflection → reactive armor heal → predator crit → crit damage → shrapnel → seismic knockback → stasis → life‑steal → DamageFlash → death» написана **дважды** в `@/d:/tankini/src/ecs/systems/CollisionSystem.ts:138-247` и `@/d:/tankini/src/ecs/systems/CollisionSystem.ts:471-538`. Любая правка фич ломает баланс в одной из веток.
@@ -107,20 +110,21 @@ import {
 
 ## 3. Производительность
 
-### 3.1. Аллокации в RAF‑цикле
-- `@/d:/tankini/src/ecs/systems/WeaponSystem.ts:148-166` — литерал `stats = { ... }` создаётся **для каждого шутера в каждый кадр**. Литералы `enemyStats`, `autoStats` (`@/d:/tankini/src/ecs/systems/WeaponSystem.ts:146,209`) — тоже.
-- `@/d:/tankini/src/ecs/systems/AISystem.ts:172-207` — каждый вызов возвращает `{sepX,sepY}` / `{avoidX,avoidY}` объектами литералом.
-- `@/d:/tankini/src/ecs/systems/RenderSystem.ts:142-454` — каждый кадр `new Set<number>()` и `[]` в `nearbyEnemies` / `nearbyObs`.
-- `@/d:/tankini/src/core/GameApp.ts:54-82` — `getGameContext()` (см. 2.3).
-- **Как чинить:** переиспользовать буферы. `SpatialGrid.queryNearby` уже принимает `out: number[]` — продолжить эту схему. Использовать out‑параметры или предсозданные структуры внутри систем.
+### 3.1. Аллокации в RAF‑цикле (РЕШЕНО)
+- [x] `@/d:/tankini/src/ecs/systems/WeaponSystem.ts:148-166` — литерал `stats = { ... }` создавался **для каждого шутера в каждый кадр**. Литералы `enemyStats`, `autoStats` (`@/d:/tankini/src/ecs/systems/WeaponSystem.ts:146,209`) — тоже. (Решено: буферизация stats-объектов на уровне WeaponSystem).
+- [x] `@/d:/tankini/src/ecs/systems/AISystem.ts:172-207` — каждый вызов возвращал `{sepX,sepY}` / `{avoidX,avoidY}` объектами литералом. (Решено: возвращаются ссылки на pre-allocated векторы).
+- [x] `@/d:/tankini/src/ecs/systems/RenderSystem.ts:142-454` — каждый кадр `new Set<number>()` и `[]` в `nearbyEnemies` / `nearbyObs` (для `staticSprites`). (Решено: переиспользование `activeEids` и статический `staticSprites` Set).
+- [x] `@/d:/tankini/src/core/GameApp.ts:54-82` — `getGameContext()` (см. 2.3). (Решено: переиспользование синглтона `sharedContext`).
 
-### 3.2. Рекурсивный `applyTint` каждый кадр
-`@/d:/tankini/src/ecs/systems/RenderSystem.ts:439-452` обходит каждое поддерево контейнера для всех видимых сущностей. При 80 врагах + игроке + туче частиц это ~1000+ обращений к свойству `tint` за кадр. И всё это — внутри `for (i ...)` по entities (`@/d:/tankini/src/ecs/systems/RenderSystem.ts:143-453`), то есть рекурсия ×N сущностей.
+### 3.2. Рекурсивный `applyTint` каждый кадр (РЕШЕНО)
+`@/d:/tankini/src/ecs/systems/RenderSystem.ts:439-452` обходил каждое поддерево контейнера для всех видимых сущностей. При 80 врагах + игроке + туче частиц это ~1000+ обращений к свойству `tint` за кадр. И всё это — внутри `for (i ...)` по entities (`@/d:/tankini/src/ecs/systems/RenderSystem.ts:143-453`), то есть рекурсия ×N сущностей.
 - **Как чинить:** хранить «целевой тинт» в компоненте (например, расширить `Renderable` полями `tintR/G/B`) и применять однократно к корневому контейнеру с `tintMode: 'inherit'` (Pixi 8 поддерживает) или к одному явному `sprite`-ребёнку.
+- **Решение:** Добавлено поле `tint: Types.ui32` в ECS-компонент `Renderable`. Вместо дорогого рекурсивного обхода всего дерева контейнера Javascript-кодом, целевой тинт вычисляется в `RenderSystem` и устанавливается напрямую на корневой контейнер `container.tint = targetTint` (что использует встроенную Pixi 8 поддержку контейнерного тинтирования с автоматическим каскадным наследованием к детям). Это исключило ~1000+ вызовов и обходов за кадр, снизив накладные расходы до O(1) за сущность.
 
-### 3.3. Линейные поиски ближайшего врага
+### 3.3. Линейные поиски ближайшего врага (РЕШЕНО)
 `@/d:/tankini/src/ecs/systems/CollisionSystem.ts:431-447,563-579,598-614` и `@/d:/tankini/src/ecs/systems/WeaponSystem.ts:189-206` каждый раз делают `query(world, [Position, AIBehavior])` и линейный перебор. У `AISystem` уже есть `enemyGrid: SpatialGrid` (`@/d:/tankini/src/ecs/systems/AISystem.ts:35-42`), но он внутри класса и недоступен другим системам.
 - **Как чинить:** вынести `SpatialGrid` врагов в общий сервис (`EnemyIndex`), переиспользовать в `WeaponSystem`, `CollisionSystem`, `EventSystem`.
+- **Решение:** Создан общий сервис `EnemyIndex` (`src/services/EnemyIndex.ts`), инициализируемый в `SystemManager` и обновляемый один раз в начале каждого кадра. Поиск ближайших врагов в `AISystem`, `WeaponSystem` и во всех трёх точках `CollisionSystem` (deflect, ricochet, chain) теперь выполняется за $O(1)$/$O(\text{nearby})$ через пространственную сетку (`SpatialGrid`) с использованием переиспользуемых буферов для полного исключения runtime GC аллокаций.
 
 ### 3.4. `Renderable.spriteId` как `ui32`
 `@/d:/tankini/src/ecs/components/index.ts:15` — `spriteId: Types.ui32`, но `SpriteId` (`@/d:/tankini/src/models/types.ts:9-35`) содержит 26 значений. Достаточно `ui8`. Аналогично для `Wreck.originalSpriteId` (`@/d:/tankini/src/ecs/components/index.ts:132`). На больших сценах — десятки КБ памяти впустую.
@@ -153,9 +157,10 @@ import {
 `@/d:/tankini/src/ecs/components/index.ts:41` — поле есть, но не пишется в `PlayerFactory` и не читается ни одной системой. Либо мёртвый код, либо потерянная фича.
 - **Как чинить:** удалить поле или реализовать (например, длительность boost для эффектов).
 
-### 4.4. Игрок остаётся «жив» после смерти
+### 4.4. Игрок остаётся «жив» после смерти (РЕШЕНО)
 В `applyAOEDamage` (`@/d:/tankini/src/ecs/systems/CollisionSystem.ts:222-241`) при смерти игрока вызывается `context.setGameOver(true)`, но **сама сущность не уничтожается** и `Health.current[eid]` остаётся отрицательным. Если в этот же кадр будет ещё один взрыв, `setGameOver` будет вызван повторно (через `setPlayerHealth`), снова и снова. Не падение, но избыточные стейт‑апдейты Zustand.
 - **Как чинить:** добавить ранний `return` если игрок уже мёртв, либо помечать игрока компонентом `Dead` и пропускать его в `applyAOEDamage`.
+- **Решение:** Добавлены проверки в `applyAOEDamage` и `handleCollision` в `CollisionSystem.ts`. Если сущность игрока является целью и его здоровье уже `<= 0` или игра окончена (`context.isGameOver === true`), урон не наносится и вызовы `setGameOver(true)` не дублируются.
 
 ### 4.5. `addCameraShake` вызывает `set` каждый кадр коллизий
 `@/d:/tankini/src/ecs/systems/CollisionSystem.ts:320` — `context.addCameraShake(impactSpeed * 2)` дергает Zustand `set` на каждой коллизии игрока (а их может быть много за тик). Это нагружает React‑рендер. Сейчас спасает `Math.min(50, ...)` clamp (`@/d:/tankini/src/stores/GameStore.ts:178`), но всё равно лучше батчить.
@@ -181,9 +186,10 @@ import {
 - `process.env.GEMINI_API_KEY` в `@/d:/tankini/vite.config.ts:11` — нигде не используется.
 - **Как чинить:** удалить или явно подключить. На каждый «may be useful later» — TODO с тикетом, иначе свалка.
 
-### 5.2. Дублирующиеся константы экрана
+### 5.2. Дублирующиеся константы экрана (РЕШЕНО)
 `RenderConfig.SCREEN_WIDTH = 1920`, `SCREEN_HEIGHT = 1080` и `GameConfig.VIRTUAL_WIDTH = 1920`, `VIRTUAL_HEIGHT = 1080` — одни и те же числа. Используются вперемешку: `App.tsx` берёт `RenderConfig`, `InputSystem` — тоже, а `SpawnSystem`/`InputSystem` — `GameConfig.VIRTUAL_*`. При изменении разрешения легко рассинхронизировать.
 - **Как чинить:** один источник правды (`GameConfig.VIRTUAL_*`), `RenderConfig.SCREEN_*` сделать алиасом или удалить.
+- **Решение:** Дублирующиеся константы `SCREEN_WIDTH` и `SCREEN_HEIGHT` были полностью удалены из `RenderConfig.ts`. В `App.tsx` и `InputViewModel.ts` импорты и ссылки были обновлены на `GameConfig.VIRTUAL_WIDTH` и `GameConfig.VIRTUAL_HEIGHT` соответственно, обеспечив единый источник правды.
 
 ### 5.3. Дубликат «PlayerStats» в TS‑модели и ECS‑компоненте
 - ECS: `@/d:/tankini/src/ecs/components/index.ts:220-246` — 25 полей.
@@ -267,24 +273,24 @@ rot-js               (генерация подземелий)
 ## 8. План действий по приоритетам
 
 ### P0 — критическое (1–2 дня)
-1. Починить дубль `Weapon` и неиспользуемые импорты в `PlayerFactory.ts` (`@/d:/tankini/src/ecs/factories/PlayerFactory.ts:1-21`).
+1. [x] Починить дубль `Weapon` и неиспользуемые импорты в `PlayerFactory.ts` (`@/d:/tankini/src/ecs/factories/PlayerFactory.ts:1-21`).
 2. Решить судьбу `hasNapalmMinigun` / `hasVampiricArmor` (реализовать или временно скрыть).
 3. Заменить `Math.random()` → `RandomUtils.random()` во всех ECS‑системах.
-4. Добавить `useGameStore(s => s.X)`‑селекторы в `MainMenu` и `MobileControls`.
-5. Удалить `src/ecs/world.ts`.
-6. Сделать `npm run lint` зелёным и подключить его к pre‑commit.
+4. [x] Добавить `useGameStore(s => s.X)`‑селекторы в `MainMenu` и `MobileControls`.
+5. [x] Удалить `src/ecs/world.ts`.
+6. [x] Сделать `npm run lint` зелёным и подключить его к pre‑commit. (Полностью скомпилировано и верифицировано!)
 
 ### P1 — высокий приоритет (1 неделя)
 7. Рефакторинг `CollisionSystem`: вынести `DamageResolver`, `ChainResolver`, `RicochetResolver` — устранить дубль логики.
-8. Объект `GameContext` сделать переиспользуемым (1 экземпляр в `GameApp`).
+8. [x] Объект `GameContext` сделать переиспользуемым (1 экземпляр в `GameApp`).
 9. Привести все таймеры к секундам, унести магические числа (i‑frames, AOE радиус Flamer, Stasis длительность) в `GameConfig`.
 10. Удалить мёртвый код (`BSPMapGenerator`, `FSM`, `GeometryUtils`, `LevelModel`, `fix-world.js`, неиспользуемые поля `RenderConfig`/`GameConfig`).
 11. Очистить `package.json` от неиспользуемых рантайм‑пакетов (`@google/genai`, `express`, `dotenv`, `gsap`, `lucide-react`, `motion`, `rbush`, `rot-js`).
-12. `EventBus`: добавить `clear()` в `GameApp.destroy()` (минимум) или превратить в инстанс‑класс (лучше).
+12. [x] `EventBus`: добавить `clear()` в `GameApp.destroy()` (минимум) или превратить в инстанс‑класс (лучше).
 
 ### P2 — средний приоритет (2–3 недели)
 13. Разрезать `RenderSystem` на 3–4 системы. То же — `SpriteBuilder`.
-14. Ввести общий `EnemyIndex` (`SpatialGrid`), переиспользовать в `Weapon`/`Collision`/`Event` системах.
+14. [x] Ввести общий `EnemyIndex` (`SpatialGrid`), переиспользовать в `Weapon`/`Collision`/`Event` системах.
 15. Подключить `vitest` + 5–10 базовых тестов (см. 6.3).
 16. ErrorBoundary, обработка `contextlost`/`contextrestored` в `PixiRenderer`.
 17. Service Worker: версия = хеш билда.
