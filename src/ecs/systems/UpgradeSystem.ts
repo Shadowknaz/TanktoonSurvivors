@@ -10,9 +10,7 @@ export class UpgradeSystem {
     private unsubscribe: () => void;
 
     constructor(eventBus: EventBus) {
-        console.log('[UpgradeSystem] Constructor called, subscribing to UpgradesChangedEvent');
         this.unsubscribe = eventBus.subscribe(UpgradesChangedEvent, (event) => {
-            console.log('[UpgradeSystem] UpgradesChangedEvent received:', event);
             this.pendingEvent = event;
         });
     }

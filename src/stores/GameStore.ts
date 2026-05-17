@@ -262,10 +262,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           inventory: updatedInventory,
       };
 
-      console.log('[GameStore] endLevelUp called, publishing via globalEventBus');
-      const event = new UpgradesChangedEvent(updatedAcquired, updatedInventory);
-      console.log('[GameStore] Publishing UpgradesChangedEvent, acquired count:', updatedAcquired.length);
-      globalEventBus.publish(event);
+      globalEventBus.publish(new UpgradesChangedEvent(updatedAcquired, updatedInventory));
 
       return newState;
   }),

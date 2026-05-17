@@ -9,7 +9,6 @@ export class EventBus {
       this.subscribers.set(eventType, []);
     }
     this.subscribers.get(eventType)!.push(handler);
-    console.log(`[EventBus] Subscribed to ${eventType.name}, total subscribers: ${this.subscribers.get(eventType)!.length}`);
     return () => this.unsubscribe(eventType, handler);
   }
 
@@ -29,7 +28,6 @@ export class EventBus {
   publish<T>(event: T): void {
     const eventType = (event as any).constructor;
     const handlers = this.subscribers.get(eventType);
-    console.log(`[EventBus] Publishing ${eventType.name || 'Unknown'}, handlers found: ${handlers?.length || 0}`);
     if (handlers) {
       handlers.forEach((handler) => handler(event));
     }
