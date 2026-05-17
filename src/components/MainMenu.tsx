@@ -5,9 +5,17 @@ import { en } from '../localization/en';
 
 export const MainMenu: React.FC = React.memo(() => {
     const setGameState = useGameStore(s => s.setGameState);
+    const toggleSound = useGameStore(s => s.toggleSound);
+    const soundVolume = useGameStore(s => s.settings.soundVolume);
 
     return (
         <div className="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center pointer-events-auto z-[60]">
+            <button
+                onClick={toggleSound}
+                className="absolute top-8 right-8 bg-gray-700 hover:bg-gray-600 text-white font-black px-6 py-3 rounded-none text-xl border-4 border-black shadow-[6px_6px_0_0_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all uppercase transform rotate-1"
+            >
+                {soundVolume > 0 ? en.sound : en.mute}
+            </button>
             <h1 className="text-8xl font-black mb-12 uppercase tracking-tighter text-white drop-shadow-[8px_8px_0_rgba(0,0,0,1)] rotate-2">
                 {en.tankGame}
             </h1>

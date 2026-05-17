@@ -13,7 +13,7 @@ import { GameState, Health } from "../ecs/components";
 import { EntityUtils } from "../utils/EntityUtils";
 import { GameConfig } from "../config/GameConfig";
 import { globalEventBus } from "./EventBus";
-import { ResetLevelEvent } from "../models/events";
+import { ResetLevelEvent, StartVehicleAudioEvent, StopVehicleAudioEvent, GoldRushStartedEvent, GoldRushEndedEvent } from "../models/events";
 
 export class GameApp {
   public pixiRenderer: PixiRenderer;
@@ -28,13 +28,16 @@ export class GameApp {
   private fps = 0;
   private frames = 0;
   private sharedContext!: GameContext;
+  private prevGameState: GameStateEnum = GameStateEnum.MENU;
+  private wasGoldRush = false;
+  private audioInitialized = false;
 
   constructor() {
     this.world = createWorld();
     this.pixiRenderer = new PixiRenderer();
     this.physicsEngine = new PhysicsEngine();
     this.inputViewModel = new InputViewModel();
-    this.systemManager = new SystemManager();
+    this.systemManager = new SystemManager(this.physicsEngine, this.sharedContext);
 
     useGameStore.getState().setInputViewModel(this.inputViewModel);
 
@@ -88,11 +91,52 @@ export class GameApp {
     if (this.isDestroyed) return;
 
     this.attachWebGLContextHandlers();
+    this.initAudioEngine();
+    this.attachVisibilityHandler();
 
     PoolManager.initPhysicsPools(this.physicsEngine);
     LevelManager.initLevel(this.world, this.physicsEngine);
 
     this.gameLoop.start();
+  }
+
+  private initAudioEngine(): void {
+    const audioEngine = this.systemManager.getAudioEngine();
+
+    // Try immediate init (may fail without user gesture)
+    audioEngine.init().catch(() => {
+      // Defer to first interaction
+      const handler = () => {
+        if (!this.audioInitialized && !this.isDestroyed) {
+          audioEngine.init().then(() => {
+            this.audioInitialized = true;
+          }).catch(() => {});
+        }
+        window.removeEventListener("pointerdown", handler);
+        window.removeEventListener("keydown", handler);
+      };
+      window.addEventListener("pointerdown", handler, { once: true });
+      window.addEventListener("keydown", handler, { once: true });
+    });
+  }
+
+  private visibilityHandler = (): void => {
+    if (this.isDestroyed) return;
+    const audioEngine = this.systemManager.getAudioEngine();
+    if (document.hidden) {
+      this.gameLoop.stop();
+      audioEngine.suspend();
+    } else {
+      this.gameLoop.start();
+      audioEngine.resume();
+      if (useGameStore.getState().gameState === GameStateEnum.PLAYING) {
+        globalEventBus.publish(new StartVehicleAudioEvent());
+      }
+    }
+  };
+
+  private attachVisibilityHandler(): void {
+    document.addEventListener("visibilitychange", this.visibilityHandler);
   }
 
   /**
@@ -185,11 +229,49 @@ export class GameApp {
 
     const alpha = this.gameLoop.getAlpha();
     this.systemManager.update(this.world, this.physicsEngine, this.inputViewModel, this.pixiRenderer, deltaTime, context, alpha);
+
+    this.handleAudioStateTransitions(context);
+  }
+
+  private handleAudioStateTransitions(context: GameContext): void {
+    const prev = this.prevGameState;
+    const curr = useGameStore.getState().gameState;
+
+    // Start vehicle audio when entering PLAYING from MENU / GAME_OVER
+    if (
+      (prev === GameStateEnum.MENU || prev === GameStateEnum.GAME_OVER) &&
+      curr === GameStateEnum.PLAYING
+    ) {
+      globalEventBus.publish(new StartVehicleAudioEvent());
+    }
+
+    // Stop vehicle audio on game over or return to menu
+    if (
+      curr === GameStateEnum.GAME_OVER ||
+      curr === GameStateEnum.MENU
+    ) {
+      if (prev === GameStateEnum.PLAYING) {
+        globalEventBus.publish(new StopVehicleAudioEvent());
+      }
+    }
+
+    // Gold Rush transitions
+    const isGoldRush = context.goldRushTimeLeft > 0;
+    if (isGoldRush && !this.wasGoldRush) {
+      globalEventBus.publish(new GoldRushStartedEvent(context.goldRushTimeLeft));
+    }
+    if (!isGoldRush && this.wasGoldRush) {
+      globalEventBus.publish(new GoldRushEndedEvent());
+    }
+
+    this.prevGameState = curr;
+    this.wasGoldRush = isGoldRush;
   }
 
   destroy() {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
+    document.removeEventListener("visibilitychange", this.visibilityHandler);
     this.gameLoop.stop();
     this.pixiRenderer.destroy();
     this.physicsEngine.destroy();

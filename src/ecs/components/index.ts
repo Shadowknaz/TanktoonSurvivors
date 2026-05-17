@@ -91,6 +91,13 @@ export const Explosive = defineComponent({
   radius: Types.f32, // 0 means no explosion
 });
 
+export const StickyProjectile = defineComponent({
+  targetEid: Types.ui32,
+  timer: Types.f32,
+  damage: Types.f32,
+  radius: Types.f32,
+});
+
 export const AutoWeapon = defineComponent({
   lastFired: Types.f32,
   cooldown: Types.f32,
@@ -234,6 +241,8 @@ export const PlayerStats = defineComponent({
   lifeStealChance: Types.f32,
   pierceCount: Types.ui8,
   evasionChance: Types.f32,
+  agilityLevel: Types.ui8,
+  hasSticky: Types.ui8,
   critChance: Types.f32,
   hasNapalmMinigun: Types.ui8,
   hasVampiricArmor: Types.ui8,

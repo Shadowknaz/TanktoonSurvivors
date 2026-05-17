@@ -23,3 +23,30 @@ export class WaveChangedEvent {
 export class ScoreChangedEvent {
   constructor(public score: number) {}
 }
+
+/** Fired by ECS systems to request a one-shot SFX. */
+export class PlaySfxEvent {
+  constructor(
+    public preset: string,
+    public x?: number,
+    public y?: number,
+  ) {}
+}
+
+/** Lifecycle events for continuous vehicle audio. */
+export class StartVehicleAudioEvent {}
+export class StopVehicleAudioEvent {}
+
+/** Gold Rush audio layer switching. */
+export class GoldRushStartedEvent {
+  constructor(public duration: number) {}
+}
+export class GoldRushEndedEvent {}
+
+/** Specific combat / world events that map to SFX presets. */
+export class BombDropEvent {
+  constructor(public x: number, public y: number) {}
+}
+export class LootDropEvent {
+  constructor(public x: number, public y: number) {}
+}

@@ -8,6 +8,7 @@ import { MainMenu } from './MainMenu';
 import { DeviceUtils } from '../utils/DeviceUtils';
 import { ResetLevelEvent } from '../models/events';
 import { globalEventBus } from '../core/EventBus';
+import { UpgradeBadge } from './ui/UpgradeBadge';
 
 // ─── Sub-selectors ──────────────────────────────────────────────────────────
 // Each selector subscribes only to the fields it actually renders.
@@ -238,15 +239,15 @@ export const UIOverlay: React.FC = () => {
           </div>
 
           {/* Right side acquired upgrades */}
-          <div className={`flex flex-col gap-1 w-48 max-h-[40vh] overflow-y-auto no-scrollbar pointer-events-auto pr-1 origin-top-right ${isMobile ? 'scale-75' : ''}`}>
+          <div className={`grid grid-cols-2 gap-1 w-48 pointer-events-auto origin-top-right self-start ${isMobile ? 'scale-75' : ''}`}>
             {acquiredUpgrades.map((u) => (
-              <div
+              <UpgradeBadge
                 key={u.option.id}
-                className={`${u.option.colorClass} opacity-90 border-4 border-black px-2 py-1 text-xs font-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex justify-between items-center w-full transform skew-x-3`}
-              >
-                <span className="truncate mr-2 uppercase">{u.option.name}</span>
-                <span className="bg-black/20 px-1 font-mono">x{u.count}</span>
-              </div>
+                option={u.option}
+                count={u.count}
+                maxLevels={u.option.maxLevels}
+                layout="horizontal"
+              />
             ))}
           </div>
           <FPSCounter />
@@ -259,10 +260,11 @@ export const UIOverlay: React.FC = () => {
       {/* Level-up panel */}
       {isLevelingUp && !isGameOver && (
         <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-auto z-50 animate-fade-in">
-          <div className={`bg-[#fdfbf7] p-6 md:p-10 border-8 border-black shadow-[20px_20px_0_0_rgba(0,0,0,1)] text-center w-full max-w-4xl max-h-screen overflow-y-auto animate-pop-in ${isMobile ? 'scale-90' : ''}`}>
+          <div className={`bg-[#fdfbf7] p-6 md:p-10 border-8 border-black shadow-[20px_20px_0_0_rgba(0,0,0,1)] text-center w-full max-w-4xl animate-pop-in ${isMobile ? 'scale-90' : ''}`}>
             <h1 className={`${isMobile ? 'text-4xl' : 'text-6xl'} font-black mb-8 uppercase tracking-tighter text-black drop-shadow-[4px_4px_0_rgba(255,255,100,1)]`}>
               {en.levelUp}
             </h1>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {currentLevelUpOptions.map((option) => (
                 <button

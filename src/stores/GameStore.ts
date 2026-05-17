@@ -93,6 +93,7 @@ interface GameStore {
   setInputViewModel: (input: InputViewModel) => void;
   addItemToInventory: (itemId: string, amount?: number) => void;
   syncPlayerHealth: (health: number, maxHealth: number) => void;
+  toggleSound: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -282,7 +283,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       return { inventory: newInventory };
   }),
-  setInputViewModel: (inputViewModel) => set({ inputViewModel })
+  setInputViewModel: (inputViewModel) => set({ inputViewModel }),
+  toggleSound: () => set((state) => ({
+    settings: {
+      ...state.settings,
+      soundVolume: state.settings.soundVolume > 0 ? 0 : 1.0,
+      musicVolume: state.settings.musicVolume > 0 ? 0 : 1.0
+    }
+  }))
 }));
 
 // Subscribe to wave and score events

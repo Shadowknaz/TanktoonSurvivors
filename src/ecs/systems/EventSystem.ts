@@ -17,6 +17,7 @@ import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
 import { getCurrentTier, GameEventType } from "../../config/WaveConfig";
 import { EventBus } from "../../core/EventBus";
+import { BombDropEvent, LootDropEvent } from "../../models/events";
 
 export class EventSystem {
   private nextEventFrames: number = 0;
@@ -161,6 +162,9 @@ export class EventSystem {
   }
 
   private spawnWarningMarker(world: World, x: number, y: number, radius: number, frames: number, type: number) {
+    if (type === 0) {
+      this.eventBus.publish(new BombDropEvent(x, y));
+    }
     const eid = addEntity(world);
     addComponent(world, eid, Position);
     Position.x[eid] = x;
@@ -178,6 +182,7 @@ export class EventSystem {
   }
 
   private spawnLootDropPhysics(world: World, physicsEngine: PhysicsEngine, x: number, y: number) {
+    this.eventBus.publish(new LootDropEvent(x, y));
     const eid = addEntity(world);
     addComponent(world, eid, Position);
     Position.x[eid] = x;

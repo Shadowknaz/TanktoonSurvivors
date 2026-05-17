@@ -54,6 +54,7 @@ export enum ComicTextType {
   WHOOSH = 10,
   WAVE_START = 11,
   TIER_UP = 12,
+  EVASION = 13,
 }
 
 export enum AIState {

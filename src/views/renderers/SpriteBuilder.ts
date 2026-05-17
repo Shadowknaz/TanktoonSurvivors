@@ -957,13 +957,17 @@ export class SpriteBuilder {
       en.bang, en.pow, en.bam, en.crash, en.boom, // 0-4
       en.killingSpree, en.rampage, en.unstoppable, en.godlike, // 5-8
       en.goldRushLong, // 9
-      en.whoosh // 10
+      en.whoosh, // 10
+      en.waveStart, // 11
+      en.tierUp, // 12
+      en.evasion // 13
     ];
     
     const safeIdx = Math.min(Math.max(0, textTypeIdx), texts.length - 1);
-    const isStreak = safeIdx >= 5 && safeIdx !== 9 && safeIdx !== 10;
+    const isStreak = safeIdx >= 5 && safeIdx !== 9 && safeIdx !== 10 && safeIdx !== 13;
     const isGoldRush = safeIdx === 9;
     const isWhoosh = safeIdx === 10;
+    const isEvasion = safeIdx === 13;
 
     const baseColors = [0xff0000, 0xff9900, 0xffff00, 0x00ffff, 0xff5500];
     const streakColors = [0xff2266, 0xff00ff, 0x6600ff, 0xffd700]; // distinctive colors for streaks
@@ -971,6 +975,7 @@ export class SpriteBuilder {
     let color = baseColors[safeIdx % baseColors.length];
     if (isGoldRush) color = 0xffd700;
     else if (isWhoosh) color = 0x88ccff; // light blue for whoosh
+    else if (isEvasion) color = 0x00ff88; // green for evasion
     else if (isStreak) color = streakColors[safeIdx - 5];
 
     const star = PoolManager.graphicsPool.acquire();

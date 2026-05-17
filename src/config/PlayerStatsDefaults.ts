@@ -17,6 +17,8 @@ export const PLAYER_STATS_DEFAULTS = {
   lifeStealChance: GameConfig.PLAYER_BASE_LIFE_STEAL_CHANCE,
   pierceCount: GameConfig.PLAYER_BASE_PIERCE_COUNT,
   evasionChance: GameConfig.PLAYER_BASE_EVASION_CHANCE,
+  agilityLevel: 0,
+  hasSticky: GameConfig.PLAYER_BASE_HAS_STICKY,
   critChance: GameConfig.PLAYER_BASE_CRIT_CHANCE,
   hasNapalmMinigun: GameConfig.PLAYER_BASE_HAS_NAPALM_MINIGUN,
   hasVampiricArmor: GameConfig.PLAYER_BASE_HAS_VAMPIRIC_ARMOR,

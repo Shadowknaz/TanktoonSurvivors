@@ -26,8 +26,8 @@ import {
 } from "../components";
 import { WaveConfig, getCurrentTier } from "../../config/WaveConfig";
 import { EventBus } from "../../core/EventBus";
-import { ScoreChangedEvent } from "../../models/events";
-import { 
+import { ScoreChangedEvent, PlaySfxEvent } from "../../models/events";
+import {
   removeEntity,
   hasComponent,
   World,
@@ -44,6 +44,8 @@ import { PoolManager } from "../../services/PoolManager";
 import { GameContext } from "../../models/GameContext";
 import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
+import { EvasionService, HitOutcome } from "../../services/EvasionService";
+import { StickyProjectileService } from "../../services/StickyProjectileService";
 
 type KillStreakThreshold = { kills: number, text: ComicTextType, shake: number };
 
@@ -120,6 +122,9 @@ export class CollisionSystem {
   }
 
   static applyAOEDamage(world: World, physicsEngine: PhysicsEngine, cx: number, cy: number, radius: number, damage: number, ownerType: OwnerType, context: GameContext, eventBus: EventBus, processed: Set<number> = new Set<number>(), isShrapnel: boolean = false) {
+    if (!isShrapnel) {
+      eventBus.publish(new PlaySfxEvent('explosion', cx, cy));
+    }
     const bounds = {
       min: { x: cx - radius, y: cy - radius },
       max: { x: cx + radius, y: cy + radius }
@@ -160,31 +165,13 @@ export class CollisionSystem {
                 let deflected = false;
                 let evaded = false;
                 if (isEidPlayer) {
-                    if (hasComponent(world, eid, PlayerBuffs) && PlayerBuffs.invulnTimer[eid] > 0) {
-                        deflected = true; // i-frames just ignore damage
-                    } else {
-                        const defChance = PlayerStats.deflectionChance[eid];
-                        const evaChance = PlayerStats.evasionChance[eid];
-                        if (evaChance > 0 && RandomUtils.random() < evaChance) {
-                            evaded = true;
-                            if (PlayerStats.hasPredator[eid]) {
-                                PlayerBuffs.predatorCrit[eid] = 1;
-                            }
-                        } else if (defChance > 0 && RandomUtils.random() < defChance) {
-                            deflected = true;
-                            if (PlayerStats.hasReactiveArmor[eid]) {
-                                PlayerBuffs.deflectionCount[eid]++;
-                                if (PlayerBuffs.deflectionCount[eid] >= GameConfig.SYNERGY_REACTIVE_ARMOR_DEFLECTIONS_NEEDED) {
-                                    PlayerBuffs.deflectionCount[eid] = 0;
-                                    const h = Health.current[eid] + GameConfig.SYNERGY_REACTIVE_ARMOR_HEAL;
-                                    Health.current[eid] = Math.min(h, Health.max[eid]);
-                                }
-                            }
-                            if (PlayerStats.hasVampiricArmor[eid]) {
-                                const h = Health.current[eid] + GameConfig.SYNERGY_VAMPIRIC_ARMOR_HEAL;
-                                Health.current[eid] = Math.min(h, Health.max[eid]);
-                            }
-                        }
+                    const outcome = EvasionService.resolvePlayerHit(world, eid);
+                    if (outcome === HitOutcome.EVADED) {
+                        evaded = true;
+                        context.setTimeScale(GameConfig.EVASION_SLOWMO_SCALE, GameConfig.EVASION_SLOWMO_DURATION);
+                    } else if (outcome === HitOutcome.DEFLECTED) {
+                        deflected = true;
+                        EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 20, ComicTextType.BAM);
                     }
                 }
 
@@ -204,7 +191,7 @@ export class CollisionSystem {
                             EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 40, ComicTextType.BAM);
                             if (PlayerStats.hasShrapnel[playerEid] && !isShrapnel) {
                                 const shrapnelSet = new Set<number>();
-                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, eventBus, shrapnelSet, true);
+                                CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], GameConfig.STICKY_PROJECTILE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, eventBus, shrapnelSet, true);
                             }
                         }
 
@@ -264,11 +251,6 @@ export class CollisionSystem {
                             }
                         }
                     }
-                } else if (evaded) {
-                    context.setTimeScale(GameConfig.EVASION_SLOWMO_SCALE, GameConfig.EVASION_SLOWMO_DURATION);
-                    EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 20, ComicTextType.WHOOSH);
-                } else if (deflected) {
-                    EffectFactory.spawnComicEffect(world, Position.x[eid], Position.y[eid] - 20, ComicTextType.BAM);
                 }
             }
         }
@@ -419,41 +401,18 @@ export class CollisionSystem {
         impact = true;
         
         let deflected = false;
-        let evaded = false;
         if (isTargetPlayer) {
-            if (hasComponent(world, targetEid, PlayerBuffs) && PlayerBuffs.invulnTimer[targetEid] > 0) {
-                deflected = true; // i-frames
-            } else {
-                const defChance = PlayerStats.deflectionChance[targetEid];
-                const evaChance = PlayerStats.evasionChance[targetEid];
-                if (evaChance > 0 && RandomUtils.random() < evaChance) {
-                    evaded = true;
-                    if (PlayerStats.hasPredator[targetEid]) {
-                        PlayerBuffs.predatorCrit[targetEid] = 1;
-                    }
-                } else if (defChance > 0 && RandomUtils.random() < defChance) {
-                    deflected = true;
-                    if (PlayerStats.hasReactiveArmor[targetEid]) {
-                        PlayerBuffs.deflectionCount[targetEid]++;
-                        if (PlayerBuffs.deflectionCount[targetEid] >= GameConfig.SYNERGY_REACTIVE_ARMOR_DEFLECTIONS_NEEDED) {
-                            PlayerBuffs.deflectionCount[targetEid] = 0;
-                            const h = Health.current[targetEid] + GameConfig.SYNERGY_REACTIVE_ARMOR_HEAL;
-                            Health.current[targetEid] = Math.min(h, Health.max[targetEid]);
-                        }
-                    }
-                    if (PlayerStats.hasVampiricArmor[targetEid]) {
-                        const h = Health.current[targetEid] + GameConfig.SYNERGY_VAMPIRIC_ARMOR_HEAL;
-                        Health.current[targetEid] = Math.min(h, Health.max[targetEid]);
-                    }
-                }
+            const outcome = EvasionService.resolvePlayerHit(world, targetEid);
+            if (outcome === HitOutcome.EVADED) {
+                context.setTimeScale(GameConfig.EVASION_SLOWMO_SCALE, GameConfig.EVASION_SLOWMO_DURATION);
+                impact = false; // Don't destroy the projectile, let it pass through
+            } else if (outcome === HitOutcome.DEFLECTED) {
+                deflected = true;
+                EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 20, ComicTextType.BAM);
             }
         }
 
-        if (evaded) {
-            context.setTimeScale(GameConfig.EVASION_SLOWMO_SCALE, GameConfig.EVASION_SLOWMO_DURATION);
-            EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 20, ComicTextType.WHOOSH);
-            impact = false; // Don't destroy the projectile, let it pass through
-        } else if (deflected && hasComponent(world, sourceEid, Projectile)) {
+        if (deflected && hasComponent(world, sourceEid, Projectile)) {
             // Ricochet logic
             EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 20, ComicTextType.BAM);
             
@@ -500,7 +459,7 @@ export class CollisionSystem {
                     EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 40, ComicTextType.BAM); // Visual feedback for crit
                     if (PlayerStats.hasShrapnel[playerEid]) {
                         const shrapnelSet = new Set<number>();
-                        CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[targetEid], Position.y[targetEid], GameConfig.UPGRADE_EXPLOSIVE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, this.eventBus, shrapnelSet, true);
+                        CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[targetEid], Position.y[targetEid], GameConfig.STICKY_PROJECTILE_RADIUS * GameConfig.SYNERGY_SHRAPNEL_RADIUS_MULT, finalDamage, ownerType, context, this.eventBus, shrapnelSet, true);
                     }
                 }
 
@@ -554,11 +513,18 @@ export class CollisionSystem {
     }
 
     if (impact) {
-        if (hasComponent(world, sourceEid, Explosive)) {
+        if (isSourceProjectile) {
+            this.eventBus.publish(new PlaySfxEvent('hit', Position.x[targetEid], Position.y[targetEid]));
+        }
+        // Handle sticky projectiles for player
+        if (isSourceProjectile && ownerType === OwnerType.PLAYER && playerEid !== -1 && PlayerStats.hasSticky[playerEid] && isTargetEnemy) {
+            StickyProjectileService.stickToTarget(world, physicsEngine, sourceEid, targetEid, damage);
+            impact = false; // Don't destroy projectile, it becomes sticky
+        } else if (hasComponent(world, sourceEid, Explosive)) {
             const radius = Explosive.radius[sourceEid];
             const px = Position.x[sourceEid];
             const py = Position.y[sourceEid];
-            
+
             CollisionSystem.applyAOEDamage(world, physicsEngine, px, py, radius, damage, ownerType, context, this.eventBus);
 
             const blastText = hasComponent(world, sourceEid, Kamikaze) ? ComicTextType.BOOM : ComicTextType.POW;

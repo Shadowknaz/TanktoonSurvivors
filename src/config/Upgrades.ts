@@ -1,4 +1,3 @@
-import { GameConfig } from "./GameConfig";
 import { en } from "../localization/en";
 
 export type UpgradeId = string;
@@ -80,13 +79,13 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
           { type: 'setTrue', stat: 'hasAutoGun' }
       ]
   },
-  { 
-      id: 'explosive', 
-      name: en.upgrades.explosive.name,
-      description: en.upgrades.explosive.description, 
+  {
+      id: 'sticky',
+      name: en.upgrades.sticky.name,
+      description: en.upgrades.sticky.description,
       colorClass: 'bg-purple-400 hover:bg-purple-300',
       effects: [
-          { type: 'statAdd', stat: 'explosiveRadius', value: GameConfig.UPGRADE_EXPLOSIVE_RADIUS }
+          { type: 'setTrue', stat: 'hasSticky' }
       ]
   },
   { 
@@ -136,7 +135,8 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
       colorClass: 'bg-cyan-400 hover:bg-cyan-300',
       maxLevels: 5,
       effects: [
-          { type: 'statAdd', stat: 'evasionChance', value: 0.1, maxValue: 0.5 }
+          { type: 'statAdd', stat: 'evasionChance', value: 0.1, maxValue: 0.5 },
+          { type: 'statAdd', stat: 'agilityLevel', value: 1 }
       ]
   },
   {

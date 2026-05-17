@@ -16,7 +16,6 @@ import {
   Lifetime,
   PlayerControlled,
   ContactDamage,
-  Explosive,
   AutoWeapon,
   Pierce,
   ArcedProjectile,
@@ -35,10 +34,12 @@ import Matter from "matter-js";
 import { GameContext } from "../../models/GameContext";
 import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
+import { globalEventBus } from "../../core/EventBus";
+import { PlaySfxEvent } from "../../models/events";
 
 /** Keys from PlayerStats that WeaponSystem reads each frame. Must be kept in sync with copyStats. */
 const WEAPON_STAT_KEYS = [
-  'damage', 'explosiveRadius', 'pierceCount', 'hasAutoGun',
+  'damage', 'pierceCount', 'hasAutoGun',
   'multishotCount', 'fireRateMultiplier', 'hasAutoVolley',
   'projectileSizeMult', 'knockbackForce', 'chainCount',
   'hasSeismic', 'hasStasis', 'hasNapalmMinigun'
@@ -83,7 +84,6 @@ export class WeaponSystem {
   /** Hot-path: manual field copy to avoid GC. Must stay in sync with WEAPON_STAT_KEYS. */
   private copyStats(src: StatsSnapshot, dest: StatsSnapshot): void {
     dest.damage = src.damage;
-    dest.explosiveRadius = src.explosiveRadius;
     dest.pierceCount = src.pierceCount;
     dest.hasAutoGun = src.hasAutoGun;
     dest.multishotCount = src.multishotCount;
@@ -135,11 +135,7 @@ export class WeaponSystem {
     if (isPlayer) {
       Projectile.ownerType[projEid] = OwnerType.PLAYER;
       ContactDamage.value[projEid] = stats!.damage;
-      
-      if (stats!.explosiveRadius > 0) {
-          addComponent(world, projEid, Explosive);
-          Explosive.radius[projEid] = stats!.explosiveRadius;
-      }
+
       if (stats!.pierceCount > 0) {
           addComponent(world, projEid, Pierce);
           Pierce.count[projEid] = stats!.pierceCount;
@@ -208,7 +204,6 @@ export class WeaponSystem {
       let stats: StatsSnapshot;
       if (isPlayer) {
           this.playerStatsBuffer.damage = PlayerStats.damage[eid];
-          this.playerStatsBuffer.explosiveRadius = PlayerStats.explosiveRadius[eid];
           this.playerStatsBuffer.pierceCount = PlayerStats.pierceCount[eid];
           this.playerStatsBuffer.hasAutoGun = PlayerStats.hasAutoGun[eid];
           this.playerStatsBuffer.multishotCount = PlayerStats.multishotCount[eid];
@@ -223,7 +218,6 @@ export class WeaponSystem {
           stats = this.playerStatsBuffer;
       } else {
           this.enemyStatsBuffer.damage = Weapon.damage[eid] || GameConfig.PROJECTILE_DAMAGE_ENEMY;
-          this.enemyStatsBuffer.explosiveRadius = 0;
           this.enemyStatsBuffer.pierceCount = 0;
           this.enemyStatsBuffer.hasAutoGun = 0;
           this.enemyStatsBuffer.multishotCount = 0;
@@ -282,7 +276,6 @@ export class WeaponSystem {
                   AutoWeapon.lastFired[eid] = gameTime;
                   this.copyStats(stats, this.autoStatsBuffer);
                   this.autoStatsBuffer.damage = AutoWeapon.damage[eid];
-                  this.autoStatsBuffer.explosiveRadius = stats?.hasNapalmMinigun ? (stats.explosiveRadius || GameConfig.UPGRADE_EXPLOSIVE_RADIUS) : 0;
                   
                   for (let s = 0; s < shotsToFire; s++) {
                       const curAngle = nearestAngle + (s - (shotsToFire - 1) / 2) * GameConfig.CLUSTER_SPREAD_ANGLE;
@@ -294,28 +287,25 @@ export class WeaponSystem {
 
       // Handle Main Weapon
       if (Weapon.isShooting[eid] === 1) {
-        const currentCooldown = isPlayer ? (Weapon.cooldown[eid] / stats!.fireRateMultiplier) : Weapon.cooldown[eid];
+        const currentCooldown = isPlayer ? (Weapon.cooldown[eid] / stats.fireRateMultiplier) : Weapon.cooldown[eid];
 
         if (gameTime - Weapon.lastFired[eid] >= currentCooldown) {
           Weapon.lastFired[eid] = gameTime;
 
           const px = Position.x[eid];
           const py = Position.y[eid];
+          const angle = Weapon.aimAngle[eid];
 
-          const tx = Weapon.targetX[eid];
-          const ty = Weapon.targetY[eid];
+          // Multishot
+          const shotCount = stats.multishotCount > 0 ? stats.multishotCount : 1;
+          for (let s = 0; s < shotCount; s++) {
+            const spread = (s - (shotCount - 1) / 2) * GameConfig.CLUSTER_SPREAD_ANGLE;
+            const curAngle = angle + spread;
+            this.createProjectile(world, physicsEngine, eid, px, py, curAngle, isPlayer, stats, Weapon.muzzleOffset[eid]);
+          }
 
-          let angle = Weapon.aimAngle[eid];
-          if (tx === 0 && ty === 0) angle = Position.angle[eid]; // Fallback
-
-          const multishotCount = isPlayer ? stats!.multishotCount : 0;
-          const totalShots = 1 + multishotCount;
-          const spreadAngle = GameConfig.CLUSTER_SPREAD_ANGLE;
-          const startAngle = angle - (spreadAngle * multishotCount) / 2;
-
-          for (let s = 0; s < totalShots; s++) {
-             const curAngle = startAngle + s * spreadAngle;
-             this.createProjectile(world, physicsEngine, eid, px, py, curAngle, isPlayer, stats, Weapon.muzzleOffset[eid] || 35);
+          if (isPlayer) {
+            globalEventBus.publish(new PlaySfxEvent('shot', px, py));
           }
         }
       }

@@ -15,6 +15,10 @@ export class RandomUtils {
     return Math.floor(this.prng() * (max - min + 1)) + min;
   }
 
+  static randomRange(min: number, max: number): number {
+    return this.prng() * (max - min) + min;
+  }
+
   static randomChoice<T>(array: T[]): T {
     return array[this.randomInt(0, array.length - 1)];
   }

@@ -14,8 +14,10 @@ import { CollisionSystem } from "../ecs/systems/CollisionSystem";
 import { EventSystem } from "../ecs/systems/EventSystem";
 import { UpgradeSystem } from "../ecs/systems/UpgradeSystem";
 import { WaveSystem } from "../ecs/systems/WaveSystem";
+import { StickyProjectileSystem } from "../ecs/systems/StickyProjectileSystem";
 import { globalEventBus } from "../core/EventBus";
 import { EnemyIndex } from "./EnemyIndex";
+import { AudioEngine } from "./audio/AudioEngine";
 
 export class SystemManager {
   private enemyIndex = new EnemyIndex();
@@ -29,18 +31,27 @@ export class SystemManager {
   private eventSystem: EventSystem;
   private upgradeSystem: UpgradeSystem;
   private waveSystem: WaveSystem;
+  private stickyProjectileSystem: StickyProjectileSystem;
+  private audioEngine: AudioEngine;
 
-  constructor() {
+  constructor(physicsEngine: PhysicsEngine, context: GameContext) {
+    this.audioEngine = new AudioEngine(globalEventBus);
     this.aiSystem = new AISystem(this.enemyIndex, globalEventBus);
     this.weaponSystem = new WeaponSystem(this.enemyIndex);
     this.collisionSystem = new CollisionSystem(this.enemyIndex, globalEventBus);
     this.eventSystem = new EventSystem(this.enemyIndex, globalEventBus);
     this.upgradeSystem = new UpgradeSystem(globalEventBus);
     this.waveSystem = new WaveSystem(globalEventBus);
+    this.stickyProjectileSystem = new StickyProjectileSystem(physicsEngine, context, globalEventBus);
+  }
+
+  getAudioEngine(): AudioEngine {
+    return this.audioEngine;
   }
 
   destroy() {
     this.upgradeSystem.destroy();
+    this.audioEngine.destroy();
   }
 
   update(world: World, physicsEngine: PhysicsEngine, inputViewModel: InputViewModel, pixiRenderer: PixiRenderer, deltaTime: number, context: GameContext, alpha: number) {
@@ -59,15 +70,20 @@ export class SystemManager {
       this.aiSystem.update(world, context, physicsEngine, deltaTime);
       this.weaponSystem.update(world, physicsEngine, deltaTime, context);
       this.physicsSyncSystem.preUpdate(world, physicsEngine, deltaTime);
-      
+
       context.updateGoldRushTimeLeft(deltaTime);
 
       physicsEngine.step(deltaTime);
 
       this.collisionSystem.update(world, physicsEngine, deltaTime, context);
       this.physicsSyncSystem.postUpdate(world, physicsEngine);
+
+      this.stickyProjectileSystem.update(world);
     }
 
-    this.renderSystem.update(world, pixiRenderer, context, alpha);                
+    this.renderSystem.update(world, pixiRenderer, context, alpha);
+
+    // Audio engine updates continuous sounds (engine RPM etc) every frame
+    this.audioEngine.update(context, deltaTime);
   }
 }
