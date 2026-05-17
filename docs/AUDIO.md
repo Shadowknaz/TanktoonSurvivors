@@ -29,15 +29,15 @@ ECS systems **do not** import audio classes. They publish events through `global
 
 All synthesis parameters are defined in `src/config/AudioConfig.ts`.
 
-### SFX (One-Shot)
+### SFX (One-Shot & Cinematic Multi-Layered)
 
-| Preset | Noise / Osc | Envelope (ADSR) | Filter Setup | Reverb Send | Thump Layer (MembraneSynth) | Notes |
-|--------|-------------|-----------------|--------------|-------------|-----------------------------|-------|
-| `shot` | White Noise | A: 1ms, D: 500ms, S: 0.0, R: 1.5s | LPF 1.5kHz (-24dB) | 35% | Note: `C2`, Decay: 0.6s, Octaves: 4, Release: 1.2s (-8dB) | Tank cannon fire |
-| `explosion` | Brown Noise | A: 5ms, D: 1.5s, S: 0.1, R: 3.0s | LPF sweep 2kHz→200Hz (0.6s) | 60% | Note: `A1`, Decay: 1.5s, Octaves: 6, Release: 2.5s (-4dB) | Bomb / mine / kamikaze detonation |
-| `hit` | Pink Noise | A: 1ms, D: 200ms, S: 0.0, R: 600ms | LPF 3.0kHz (-12dB) | 20% | Note: `C3`, Decay: 0.15s, Octaves: 2, Release: 0.4s (-12dB) | Projectile impact |
-| `bombDrop` | White Noise | A: 100ms, D: 400ms, S: 0.0, R: 500ms | LPF sweep 4kHz→400Hz (1.0s) | 20% | *None* | Falling bomb whistle |
-| `lootDrop` | Sine (PolySynth) | A: 10ms, D: 200ms, S: 0.0, R: 400ms | LPF 6.0kHz (-12dB) | 25% | *None* | Tonal jingle: 880→1100→1320 Hz (A5→C#6→E6) |
+| Preset | Layers | Synthesis Mechanics | Processing & Buses | Notes |
+|--------|--------|---------------------|--------------------|-------|
+| `shot` | **1. Crack** (Pink NoiseSynth)<br>**2. Wave** (Sine OscSweep)<br>**3. Blast** (Brown Noise LPF Sweep) | • **Crack:** A: 1ms, D: 200ms, Vol: -10dB (smooth pink punch)<br>• **Wave:** 250Hz→20Hz (0.3s sweep), Distortion (0.6), Vol: -12dB<br>• **Blast:** Muffled LPF sweep 1.5kHz→60Hz (1.5s, -48dB/oct), Distortion (0.9), Vol: -14dB | Master cinematic compression bus (threshold: -24dB, ratio: 20, attack: 1ms, release: 500ms) + 6-second epic Reverb (decay: 6s, pre-delay: 50ms, wet: 0.5) | Muffled premium cinematic tank cannon fire |
+| `explosion` | **1. Boom** (Brown Noise Sweep)<br>**2. Debris** (Pink Noise HPF) | • **Boom:** Muffled LPF sweep 1.2kHz→100Hz (1.5s, -24dB/oct), Distortion (0.7), Vol: -12dB<br>• **Debris:** HPF 1.5kHz, A: 100ms, D: 1.5s, Vol: -18dB | Routing through the epic cinematic Reverb (decay 6s) + heavy Master Compressor | Muffled target detonation and physical wreckage crash |
+| `hit` | **1. Armor** (MetalSynth)<br>**2. Debris** (Pink Noise HPF) | • **Armor:** Freq: 200Hz, Harms: 5.1, ModIdx: 32, Resonance: 2kHz, Octaves: 1.5, Vol: -8dB<br>• **Debris:** HPF 1.5kHz, A: 100ms, D: 1.5s, Vol: -18dB | • **Armor:** Master Cinematic Compressor<br>• **Debris:** Epic Cinematic Reverb send | Direct shell impact and armor penetration clang |
+| `bombDrop` | *Single* (White Noise) | A: 100ms, D: 400ms, S: 0.0, R: 500ms | LPF sweep 4kHz→400Hz (1.0s), routed through standard Master Reverb (2.5s) | Falling bomb whistle |
+| `lootDrop` | *Tonal* (Sine PolySynth) | A: 10ms, D: 200ms, S: 0.0, R: 400ms | LPF 6.0kHz, routed through standard Master Reverb (2.5s) | Tonal jingle: 880→1100→1320 Hz (A5→C#6→E6) |
 
 ### Vehicle (Continuous)
 
@@ -48,15 +48,32 @@ All synthesis parameters are defined in `src/config/AudioConfig.ts`.
 
 ### Music
 
-- **Normal:** D-minor chord progression (`D3-F3-A3`, `G3-B3-D4`, `A3-C4-E4`, `D3-F3-A3`), 2 synth layers (sine + triangle polyphonic synths, LPF 2.0kHz), BPM 110.
-- **Gold Rush:** D-major chord progression (`D3-F#3-A3`, `G3-B3-D4`, `A3-C#4-E4`, `D3-F#3-A3`), 4 layers (detuned polyphonic synths with sine, triangle, and square waveforms, LPF 3.5kHz), BPM 137.5 (1.25×).
+The music system is programmatically orchestrated using a single high-performance `Tone.Loop` running on eighth notes (`8n`). This avoids multi-loop CPU overhead, minimizes Garbage Collection, and guarantees perfect track alignment.
+
+- **Harmonies & Key:** Normal gameplay plays in D-minor. Gold Rush mode transitions smoothly to D-major (ramping up tempo by 1.25x).
+- **Crescendo / Dynamic Intensity Engine:** The music engine reacts dynamically to global game state, wave numbers, and survival time, opening up instruments step-by-step using smooth volume ramp sweeps (1.5s):
+  - **Intensity 0 (Wave 1, survival time < 30s):** *Ambient Intro* — Only Pad chords and slow Arpeggiator are active.
+  - **Intensity 1 (Wave 2, survival time >= 30s):** *Rhythmic Pulse* — Bassline fades in, adding low-end pulse.
+  - **Intensity 2 (Wave 3, survival time >= 60s):** *Thumping Groove* — Membrane Kick drum fades in, playing syncopated downbeats.
+  - **Intensity 3 (Wave 4, survival time >= 90s):** *Backbeat Drive* — Noise Snare drum fades in, delivering a solid backbeat.
+  - **Intensity 4 (Wave 5+, survival time >= 120s):** *Full Battle Charge* — Hi-Hats fade in, completing the dynamic drive.
+  - **Gold Rush Overdrive:** Accelerates tempo to 137.5 BPM, transitions bass to high-energy alternate-octave driving rhythm, triggers 16th-note hyper-speed chiptune leads, plays four-on-the-floor kick patterns, and layers sizzling off-beat hi-hats.
+- **Track & Drum Layout:**
+  - **Pad Track:** Warm `Tone.PolySynth` with a triangle oscillator and LPF (800Hz) triggering 2-measure (`2m`) sustained chords. Adds a bright, soaring octave root during Gold Rush.
+  - **Bass Track:** Thick `Tone.Synth` with a sawtooth oscillator and LPF (250Hz). Alternates octaves dynamically in Gold Rush, or pulses on quarter beats during normal gameplay.
+  - **Arpeggiator Track:** Retro `Tone.Synth` with a square oscillator and BPF (1.5kHz). Cycles slow, gentle landscapes, or unleashes hyper-speed chiptune lines in Gold Rush.
+  - **Kick Drum:** Synthesized thumping `Tone.MembraneSynth` that plays syncopated downbeat patterns in normal play, or a four-on-the-floor club beat in Gold Rush.
+  - **Snare Drum:** Synthesized `Tone.NoiseSynth` utilizing bandpassed pink noise (1.2kHz) for a crisp backbeat crack on beats 2 and 4.
+  - **Hi-Hats:** Sizzling `Tone.NoiseSynth` with an HPF (8.0kHz) triggering upbeat hi-hats.
 
 ## Anti-8-Bit & Warmth Techniques
 
 Every preset applies the following techniques to avoid typical harsh chiptune character and sound premium:
 
-1. **Reverb** — A global master `Tone.Reverb` (decay 2.5s, pre-delay 30ms, wet 25%) creates space and depth.
-2. **Sub-Bass Layering (Thump)** — membrana synth layers (`MembraneSynth`) generate clean low-end punches for physically impactful events.
+1. **Dedicated DAW Bus Routing** — Incorporates parallel compression and reverb:
+   - **Standard Bus:** Master `Tone.Reverb` (decay 2.5s, wet 25%) + master lowpass filter.
+   - **Cinematic Bus:** Dedicated parallel `Tone.Compressor` (20:1 ratio, 1ms attack) + heavy `Tone.Reverb` (decay 6.0s, wet 50%) for cinema-grade low-end saturation, physical rumble, and massive epic tail.
+2. **Sub-Bass Layering & Wave Shaping** — Custom low-frequency oscillator sweeps down to 20Hz and wave-shaping distortion (up to 0.9 wet) create rich harmonics and physical impacts that shake the headphones.
 3. **ADSR & Slopes** — Avoids instant on/off states. Minimum attack times prevent click artifacts, and extended release stages allow natural acoustic fades.
 4. **Low-Pass Filtering** — Every synthesizer and noise generator is passed through high-order low-pass filters (LPF) to warm the high end.
 5. **Micro-variation** — Triggers introduce random detuning (±5%), timing jitter (±20ms), and gain offsets (±2dB) to create an organic, non-repetitive response.
@@ -64,8 +81,9 @@ Every preset applies the following techniques to avoid typical harsh chiptune ch
 ## Adding a New Sound
 
 1. Add a preset object to `AudioConfig.SFX` (or `AudioConfig.MUSIC`, etc.).
-2. If it is a noise-based SFX, `SfxPlayer.initVoices()` will initialize the signal chain automatically. Tonal sounds must be added under `lootDrop` or triggered directly via `playTonalSequence`.
-3. If it requires a low-frequency thump layer, add its membrane synth configuration to `SfxPlayer.initThumpSynths()`.
-4. Emit the appropriate event from the relevant ECS system or `GameApp`.
-5. Document the preset in this file.
+2. If it is a basic noise-based SFX, `SfxPlayer.initVoices()` will initialize the signal chain automatically. Tonal sounds must be added under `lootDrop` or triggered directly via `playTonalSequence`.
+3. If it is a highly customized cinematic multi-layered sound, declare the private class nodes in `SfxPlayer.ts` and initialize them manually under `SfxPlayer.initCinematicVoices()`.
+4. If it requires a low-frequency thump layer, add its membrane synth configuration to `SfxPlayer.initThumpSynths()`.
+5. Emit the appropriate event from the relevant ECS system or `GameApp`.
+6. Document the preset in this file.
 

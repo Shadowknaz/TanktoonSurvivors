@@ -150,6 +150,14 @@ export class AudioEngine {
       const musicDb = musicVol <= 0 ? -Infinity : 20 * Math.log10(musicVol);
 
       this.musicPlayer.setMusicVolume(musicDb);
+
+      // Dynamically drive procedural music intensity (crescendo / instrumentation progression)
+      this.musicPlayer.updateDynamicIntensity({
+        gameState: state.gameState,
+        currentWave: state.currentWave,
+        survivalTime: state.survivalTime,
+        playerLevel: state.playerLevel,
+      });
     });
   }
 
