@@ -18,12 +18,14 @@ export const EventConfig = {
   // Loot Drop
   LOOT_TYPES: {
     SPEED: 0,
-    INVULNERABLE: 1
+    INVULNERABLE: 1,
+    REPAIR_PART: 2
   },
   LOOT_RADIUS: 20,
   LOOT_SPEED_BONUS: 10,
   LOOT_SPEED_DURATION: 600, // 10 seconds
   LOOT_INVULN_DURATION: 300, // 5 seconds
+  LOOT_REPAIR_PART_HEAL: 15,
 
   // Cluster Mines
   CLUSTER_MINES_COUNT: 15,

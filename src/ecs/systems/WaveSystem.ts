@@ -1,5 +1,5 @@
-import { World } from "bitecs";
-import { GameState, Position } from "../components";
+import { World, query } from "bitecs";
+import { GameState, Position, Boss } from "../components";
 import { EntityUtils } from "../../utils/EntityUtils";
 import { WaveConfig, getCurrentTier } from "../../config/WaveConfig";
 import { EventBus } from "../../core/EventBus";
@@ -17,8 +17,12 @@ export class WaveSystem {
     // Update survival time
     GameState.survivalTime[gs] += deltaTime;
 
-    // Decrement wave timer
-    GameState.waveTimer[gs] -= deltaTime;
+    // Freeze wave progression while boss is active
+    const bosses = query(world, [Boss]);
+    if (bosses.length === 0) {
+      // Decrement wave timer
+      GameState.waveTimer[gs] -= deltaTime;
+    }
 
     // Check for wave transition
     if (GameState.waveTimer[gs] <= 0) {

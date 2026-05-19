@@ -1,13 +1,15 @@
 import {  addEntity, addComponent, query, removeEntity, hasComponent, removeComponent, World } from "bitecs";
-import { Position, WarningMarker, Velocity, LootDrop, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating, GameState } from "../components";
+import { Position, WarningMarker, Velocity, Renderable, MatterBody, ContactDamage, Health, Landmine, Lifetime, Explosive, Airdrop, Detonating, GameState, FireZone, Particle } from "../components";
 import { SpriteId, ComicTextType } from "../../models/types";
 import { EventConfig } from "../../config/EventConfig";
+import { BossConfig } from "../../config/BossConfig";
 import { MathUtils } from "../../utils/MathUtils";
 import { MapUtils } from "../../utils/MapUtils";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { CellularAutomata } from "../../utils/CellularAutomata";
 import { EffectFactory } from "../factories/EffectFactory";
 import { EnemyFactory } from "../factories/EnemyFactory";
+import { LootFactory } from "../factories/LootFactory";
 import { EnemyType, ENEMY_TEMPLATES } from "../../config/EnemyConfig";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
@@ -17,7 +19,7 @@ import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
 import { getCurrentTier, GameEventType } from "../../config/WaveConfig";
 import { EventBus } from "../../core/EventBus";
-import { BombDropEvent, LootDropEvent } from "../../models/events";
+import { BombDropEvent } from "../../models/events";
 
 export class EventSystem {
   private nextEventFrames: number = 0;
@@ -96,12 +98,26 @@ export class EventSystem {
            continue;
         }
 
-        const radius = type === 0 ? EventConfig.BOMBER_RADIUS : EventConfig.ARTILLERY_RADIUS;
-        const damage = type === 0 ? EventConfig.BOMBER_DAMAGE : EventConfig.ARTILLERY_DAMAGE;
+        let radius = type === 0 ? EventConfig.BOMBER_RADIUS : EventConfig.ARTILLERY_RADIUS;
+        let damage = type === 0 ? EventConfig.BOMBER_DAMAGE : EventConfig.ARTILLERY_DAMAGE;
+
+        if (type === 3) {
+            radius = BossConfig.TITAN.MORTAR_RADIUS;
+            damage = BossConfig.TITAN.PHASES[1].damage;
+        }
 
         CollisionSystem.applyAOEDamage(world, physicsEngine, x, y, radius, damage, 0, context, this.eventBus); // 0 = env
         
         EffectFactory.spawnComicEffect(world, x, y, 4); // BOOM effect
+
+        if (type === 3) {
+            const fireEid = EffectFactory.spawnFireZone(world, x, y);
+            FireZone.tickRate[fireEid] = BossConfig.TITAN.FIRE_ZONE_TICK_RATE;
+            FireZone.tickDamage[fireEid] = BossConfig.TITAN.FIRE_ZONE_DAMAGE;
+            Lifetime.timer[fireEid] = BossConfig.TITAN.FIRE_ZONE_DURATION_SEC;
+            Particle.initialLife[fireEid] = BossConfig.TITAN.FIRE_ZONE_DURATION_SEC;
+        }
+
         removeEntity(world, eid);
       }
     }
@@ -182,31 +198,8 @@ export class EventSystem {
   }
 
   private spawnLootDropPhysics(world: World, physicsEngine: PhysicsEngine, x: number, y: number) {
-    this.eventBus.publish(new LootDropEvent(x, y));
-    const eid = addEntity(world);
-    addComponent(world, eid, Position);
-    Position.x[eid] = x;
-    Position.y[eid] = y;
-
-    addComponent(world, eid, LootDrop);
-    LootDrop.type[eid] = RandomUtils.random() > 0.5 ? EventConfig.LOOT_TYPES.SPEED : EventConfig.LOOT_TYPES.INVULNERABLE;
-    
-    addComponent(world, eid, Renderable);
-    Renderable.spriteId[eid] = SpriteId.LOOT_CRATE;
-    Renderable.visible[eid] = 1;
-
-    // ContactDamage just so it triggers handleCollision inside CollisionSystem 
-    // without modifying the massive if/else in CollisionSystem too much
-    addComponent(world, eid, ContactDamage);
-    ContactDamage.value[eid] = 0;
-
-    const body = physicsEngine.createCircleBody(x, y, EventConfig.LOOT_RADIUS, { 
-        isSensor: true,
-        label: "LootCrate" 
-    }, eid);
-    physicsEngine.setCollisionFilter(body, CollisionCategory.SENSOR, CollisionCategory.PLAYER);
-    addComponent(world, eid, MatterBody);
-    MatterBody.bodyId[eid] = body.id;
+    const type = RandomUtils.random() > 0.5 ? EventConfig.LOOT_TYPES.SPEED : EventConfig.LOOT_TYPES.INVULNERABLE;
+    LootFactory.createLootDrop(world, physicsEngine, this.eventBus, x, y, type);
   }
 
   private spawnClusterMines(world: World, physicsEngine: PhysicsEngine, px: number, py: number) {

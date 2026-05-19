@@ -32,6 +32,9 @@ export enum SpriteId {
   ENEMY_GRENADIER = 24,
   ENEMY_FLAMER = 25,
   ENEMY_SAPPER = 26,
+  BOSS_TITAN = 27,
+  BOSS_HARBINGER = 28,
+  BOSS_PHANTOM = 29,
 }
 
 export enum OwnerType {

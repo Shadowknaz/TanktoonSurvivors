@@ -27,7 +27,7 @@ export class GameApp {
   private lastFpsTime = 0;
   private fps = 0;
   private frames = 0;
-  private sharedContext!: GameContext;
+  private sharedContext: GameContext;
   private prevGameState: GameStateEnum = GameStateEnum.MENU;
   private wasGoldRush = false;
   private audioInitialized = false;
@@ -37,7 +37,6 @@ export class GameApp {
     this.pixiRenderer = new PixiRenderer();
     this.physicsEngine = new PhysicsEngine();
     this.inputViewModel = new InputViewModel();
-    this.systemManager = new SystemManager(this.physicsEngine, this.sharedContext);
 
     useGameStore.getState().setInputViewModel(this.inputViewModel);
 
@@ -68,6 +67,9 @@ export class GameApp {
          setTimeScale: (sc, dur) => useGameStore.getState().setTimeScale(sc, dur),
          getPlayerHealth: () => this.getPlayerHealth()
     };
+
+    // sharedContext must be initialized before SystemManager, which passes it to StickyProjectileSystem
+    this.systemManager = new SystemManager(this.physicsEngine, this.sharedContext);
 
     this.gameLoop = new GameLoop(
         this.update.bind(this),

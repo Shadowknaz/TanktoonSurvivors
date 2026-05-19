@@ -5,7 +5,15 @@ import { GameState } from "../models/types";
 import { InputViewModel } from "../viewmodels/InputViewModel";
 import { UpgradeUtils } from "../utils/UpgradeUtils";
 import { globalEventBus } from "../core/EventBus";
-import { UpgradesChangedEvent, WaveChangedEvent, ScoreChangedEvent } from "../models/events";
+import {
+  UpgradesChangedEvent,
+  WaveChangedEvent,
+  ScoreChangedEvent,
+  BossSpawnedEvent,
+  BossHealthChangedEvent,
+  BossPhaseChangedEvent,
+  BossDefeatedEvent
+} from "../models/events";
 
 export interface PerkEffect {
   type: "damage" | "health" | "speed" | "fireRate" | "other";
@@ -62,6 +70,13 @@ interface GameStore {
   // playerStats removed, managed by ECS PlayerStats component
   inputViewModel: InputViewModel | null;
 
+  // Boss state
+  bossActive: boolean;
+  bossNameKey: string;
+  bossHealth: number;
+  bossMaxHealth: number;
+  bossPhase: number;
+
   // Derived getters
   isGameOver: () => boolean;
   isLevelingUp: () => boolean;
@@ -94,6 +109,12 @@ interface GameStore {
   addItemToInventory: (itemId: string, amount?: number) => void;
   syncPlayerHealth: (health: number, maxHealth: number) => void;
   toggleSound: () => void;
+
+  // Boss actions
+  spawnBoss: (nameKey: string, maxHealth: number) => void;
+  updateBossHealth: (health: number, maxHealth: number) => void;
+  updateBossPhase: (phase: number) => void;
+  defeatBoss: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -128,6 +149,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   timeScaleDuration: 0,
   // playerStats removed
   inputViewModel: null,
+
+  // Boss default state
+  bossActive: false,
+  bossNameKey: "",
+  bossHealth: 0,
+  bossMaxHealth: 0,
+  bossPhase: 1,
 
   isGameOver: () => get().gameState === GameState.GAME_OVER,
   isLevelingUp: () => get().gameState === GameState.LEVEL_UP,
@@ -177,6 +205,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
           timeScale: 1.0,
           timeScaleDuration: 0,
           activeBuff: null,
+          bossActive: false,
+          bossNameKey: "",
+          bossHealth: 0,
+          bossMaxHealth: 0,
+          bossPhase: 1,
       };
   }),
   addCameraShake: (amount) => set((state) => ({ cameraShake: Math.min(50, state.cameraShake + amount) })),
@@ -290,6 +323,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
       soundVolume: state.settings.soundVolume > 0 ? 0 : 1.0,
       musicVolume: state.settings.musicVolume > 0 ? 0 : 1.0
     }
+  })),
+  spawnBoss: (nameKey, maxHealth) => set(() => ({
+    bossActive: true,
+    bossNameKey: nameKey,
+    bossHealth: maxHealth,
+    bossMaxHealth: maxHealth,
+    bossPhase: 1,
+  })),
+  updateBossHealth: (health, maxHealth) => set(() => ({
+    bossHealth: health,
+    bossMaxHealth: maxHealth,
+  })),
+  updateBossPhase: (phase) => set(() => ({
+    bossPhase: phase,
+  })),
+  defeatBoss: () => set(() => ({
+    bossActive: false,
   }))
 }));
 
@@ -304,8 +354,28 @@ export function subscribeToWaveEvents() {
     useGameStore.getState().setScore(event.score);
   });
 
+  const unsubBossSpawn = globalEventBus.subscribe(BossSpawnedEvent, (event) => {
+    useGameStore.getState().spawnBoss(event.nameKey, event.maxHealth);
+  });
+
+  const unsubBossHealth = globalEventBus.subscribe(BossHealthChangedEvent, (event) => {
+    useGameStore.getState().updateBossHealth(event.currentHealth, event.maxHealth);
+  });
+
+  const unsubBossPhase = globalEventBus.subscribe(BossPhaseChangedEvent, (event) => {
+    useGameStore.getState().updateBossPhase(event.phase);
+  });
+
+  const unsubBossDefeat = globalEventBus.subscribe(BossDefeatedEvent, () => {
+    useGameStore.getState().defeatBoss();
+  });
+
   return () => {
     unsubWave();
     unsubScore();
+    unsubBossSpawn();
+    unsubBossHealth();
+    unsubBossPhase();
+    unsubBossDefeat();
   };
 }

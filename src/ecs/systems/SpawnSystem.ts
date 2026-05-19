@@ -1,17 +1,82 @@
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import {  query , World } from "bitecs";
-import { Position, AIBehavior, GameState } from "../components";
+import { Position, AIBehavior, GameState, Boss } from "../components";
 import { MapUtils } from "../../utils/MapUtils";
 import { GameConfig } from "../../config/GameConfig";
 import { RandomUtils } from "../../utils/RandomUtils";
 import { GameContext } from "../../models/GameContext";
 import { EntityUtils } from "../../utils/EntityUtils";
 import { getCurrentTier, getTierSpawnPool } from "../../config/WaveConfig";
+import { BossConfig } from "../../config/BossConfig";
+import { globalEventBus } from "../../core/EventBus";
+import { EnemyFactory } from "../factories/EnemyFactory";
+import { ENEMY_TEMPLATES, EnemyType } from "../../config/EnemyConfig";
+import { BossSpawnedEvent } from "../../models/events";
 
 export class SpawnSystem {
   update(world: World, physicsEngine: PhysicsEngine, deltaTime: number, context: GameContext) {
     const gs = EntityUtils.getGameState(world);
     if (!gs) return;
+
+    // Pause normal spawns when a boss is active
+    const bosses = query(world, [Boss]);
+    if (bosses.length > 0) {
+      return;
+    }
+
+    const currentWave = GameState.currentWave[gs];
+    const isBossWave = (currentWave % BossConfig.BOSS_WAVE_INTERVAL === 0);
+
+    if (isBossWave && GameState.bossSpawnedWave[gs] < currentWave) {
+      // Find player position
+      const playerEid = EntityUtils.getFirstPlayer(world);
+      const rw = GameConfig.VIRTUAL_WIDTH;
+      const rh = GameConfig.VIRTUAL_HEIGHT;
+      let px = rw / 2;
+      let py = rh / 2;
+      if (playerEid) {
+        px = Position.x[playerEid];
+        py = Position.y[playerEid];
+      }
+
+      let spawnX = px + 400; // Default offset
+      let spawnY = py + 400;
+      
+      const spawnDistX = rw / 2 + GameConfig.ENEMY_SPAWN_MARGIN_PX;
+      const spawnDistY = rh / 2 + GameConfig.ENEMY_SPAWN_MARGIN_PX;
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const randPos = MapUtils.getRandomPosition(100);
+        const testX = randPos.x;
+        const testY = randPos.y;
+
+        // Outside player view but not too far
+        if (Math.abs(testX - px) < spawnDistX && Math.abs(testY - py) < spawnDistY) {
+          continue;
+        }
+
+        if (physicsEngine.isPositionFree(testX, testY, 60)) { // Boss needs a slightly larger free radius (60px)
+          spawnX = testX;
+          spawnY = testY;
+          break;
+        }
+      }
+
+      // Spawn the boss!
+      const bossTemplate = ENEMY_TEMPLATES[EnemyType.BOSS_TITAN];
+      EnemyFactory.createEnemy(world, physicsEngine, spawnX, spawnY, bossTemplate);
+      
+      // Update bossSpawnedWave to prevent spawning again in this wave
+      GameState.bossSpawnedWave[gs] = currentWave;
+
+      // Publish event
+      const maxHp = bossTemplate.health;
+      globalEventBus.publish(new BossSpawnedEvent(BossConfig.TITAN.NAME_KEY, maxHp));
+
+      // Trigger standard SpawnSystem cooldown to wait a bit
+      GameState.spawnTimer[gs] = 3.0; // 3 seconds delay before regular waves
+      return;
+    }
 
     GameState.spawnTimer[gs] -= deltaTime;
 
@@ -19,7 +84,6 @@ export class SpawnSystem {
     const enemies = query(world, [AIBehavior]);
 
     // Get current tier for difficulty scaling
-    const currentWave = GameState.currentWave[gs];
     const tier = getCurrentTier(currentWave);
     const maxEnemies = context.goldRushTimeLeft > 0 ? 150 : tier.maxEnemies;
 

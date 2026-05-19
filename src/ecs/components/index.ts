@@ -222,12 +222,28 @@ export const GameState = defineComponent({
   currentTier: Types.ui32,
   score: Types.ui32,
   survivalTime: Types.f32,
+  bossSpawnedWave: Types.ui32,
 });
 
 export const MapBounds = defineComponent({
   width: Types.f32,
   height: Types.f32,
 });
+
+export const Boss = defineComponent({
+  bossType: Types.ui8,         // 0: TITAN, 1: HARBINGER, 2: PHANTOM
+  currentPhase: Types.ui8,     // Current phase (1, 2, 3)
+  phaseHPThreshold: Types.f32, // Health threshold to trigger next phase
+  actionTimer: Types.f32,      // Timer for boss actions/cooldowns
+  shieldActive: Types.ui8,     // 0: inactive, 1: active shield
+});
+
+export const EntityRelation = defineComponent({
+  parentEid: Types.ui32,
+  relationType: Types.ui8,     // 0: ShieldAnchor, 1: MirageClone
+});
+
+
 
 export const PlayerStats = defineComponent({
   speed: Types.f32,
@@ -238,14 +254,14 @@ export const PlayerStats = defineComponent({
   hasAutoGun: Types.ui8,
   explosiveRadius: Types.f32,
   multishotCount: Types.ui8,
-  lifeStealChance: Types.f32,
+  scrapDropChance: Types.f32,
   pierceCount: Types.ui8,
   evasionChance: Types.f32,
   agilityLevel: Types.ui8,
   hasSticky: Types.ui8,
   critChance: Types.f32,
   hasNapalmMinigun: Types.ui8,
-  hasVampiricArmor: Types.ui8,
+  hasScrapArmor: Types.ui8,
   hasRicochet: Types.ui8,
   hasAdrenaline: Types.ui8,
   hasShrapnel: Types.ui8,

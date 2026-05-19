@@ -62,8 +62,8 @@ export class EvasionService {
       }
     }
 
-    if (PlayerStats.hasVampiricArmor[eid]) {
-      const h = Health.current[eid] + GameConfig.SYNERGY_VAMPIRIC_ARMOR_HEAL;
+    if (PlayerStats.hasScrapArmor[eid]) {
+      const h = Health.current[eid] + GameConfig.SYNERGY_SCRAP_ARMOR_HEAL;
       Health.current[eid] = Math.min(h, Health.max[eid]);
     }
   }

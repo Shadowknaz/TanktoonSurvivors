@@ -43,10 +43,31 @@ export class GoldRushStartedEvent {
 }
 export class GoldRushEndedEvent {}
 
-/** Specific combat / world events that map to SFX presets. */
 export class BombDropEvent {
   constructor(public x: number, public y: number) {}
 }
 export class LootDropEvent {
   constructor(public x: number, public y: number) {}
 }
+
+/** Boss-related events for UI and sound synchronization. */
+export class BossSpawnedEvent {
+  constructor(
+    public nameKey: string,
+    public maxHealth: number
+  ) {}
+}
+
+export class BossHealthChangedEvent {
+  constructor(
+    public currentHealth: number,
+    public maxHealth: number
+  ) {}
+}
+
+export class BossPhaseChangedEvent {
+  constructor(public phase: number) {}
+}
+
+export class BossDefeatedEvent {}
+

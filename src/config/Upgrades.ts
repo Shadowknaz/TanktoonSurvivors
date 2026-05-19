@@ -109,13 +109,13 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
       ]
   },
   {
-      id: 'vampirism',
-      name: en.upgrades.vampirism.name,
-      description: en.upgrades.vampirism.description,
-      colorClass: 'bg-red-600 hover:bg-red-500',
+      id: 'scrapCollector',
+      name: en.upgrades.scrapCollector.name,
+      description: en.upgrades.scrapCollector.description,
+      colorClass: 'bg-emerald-600 hover:bg-emerald-500',
       maxLevels: 3,
       effects: [
-          { type: 'statAdd', stat: 'lifeStealChance', value: 0.1, maxValue: 0.3 }
+          { type: 'statAdd', stat: 'scrapDropChance', value: 0.1, maxValue: 0.3 }
       ]
   },
   {
@@ -166,20 +166,20 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
       ]
   },
   {
-      id: 'vampiricArmor',
-      name: en.upgrades.vampiricArmor.name,
-      description: en.upgrades.vampiricArmor.description,
-      colorClass: 'bg-rose-700 hover:bg-rose-600',
+      id: 'scrapArmor',
+      name: en.upgrades.scrapArmor.name,
+      description: en.upgrades.scrapArmor.description,
+      colorClass: 'bg-emerald-700 hover:bg-emerald-600',
       maxLevels: 1,
       isSynergy: true,
       requirements: [
-          { id: 'vampirism', minLevel: 3 },
+          { id: 'scrapCollector', minLevel: 3 },
           { id: 'armor', minLevel: 4 }
       ],
       effects: [
-          { type: 'removeUpgrade', upgradeId: 'vampirism' },
+          { type: 'removeUpgrade', upgradeId: 'scrapCollector' },
           { type: 'removeUpgrade', upgradeId: 'armor' },
-          { type: 'setTrue', stat: 'hasVampiricArmor' }
+          { type: 'setTrue', stat: 'hasScrapArmor' }
       ]
   },
   {
@@ -205,7 +205,7 @@ export const UPGRADE_OPTIONS: UpgradeOption[] = [
       maxLevels: 1,
       isSynergy: true,
       requirements: [
-          { id: 'vampirism', minLevel: 1 },
+          { id: 'scrapCollector', minLevel: 1 },
           { id: 'speed', minLevel: 2 }
       ],
       effects: [

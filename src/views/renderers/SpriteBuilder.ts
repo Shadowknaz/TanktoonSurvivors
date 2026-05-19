@@ -340,6 +340,8 @@ export class SpriteBuilder {
         SpriteBuilder.drawEnemyFlamer(container);
     } else if (spriteId === SpriteId.ENEMY_SAPPER) {
         SpriteBuilder.drawEnemySapper(container);
+    } else if (spriteId === SpriteId.BOSS_TITAN) {
+        SpriteBuilder.drawBossTitan(container);
     } else if (spriteId === SpriteId.COMIC_EFFECT && hasComponent(world, eid, ComicEffect)) {
       if (container.children.length === 0) {
         SpriteBuilder.drawComicEffect(container, ComicEffect.textType[eid]);
@@ -593,7 +595,7 @@ export class SpriteBuilder {
 
     sprite.beginPath();
     sprite.circle(0, 0, 10);
-    sprite.fill({ color: type === 0 ? 0x00aaff : 0xffaa00 });
+    sprite.fill({ color: type === 0 ? 0x00aaff : type === 1 ? 0xffaa00 : 0x22c55e });
     sprite.stroke({ width: 2, color: 0x000000 });
   }
 
@@ -964,10 +966,13 @@ export class SpriteBuilder {
     ];
     
     const safeIdx = Math.min(Math.max(0, textTypeIdx), texts.length - 1);
-    const isStreak = safeIdx >= 5 && safeIdx !== 9 && safeIdx !== 10 && safeIdx !== 13;
+    const isStreak = safeIdx >= 5 && safeIdx <= 8;
     const isGoldRush = safeIdx === 9;
     const isWhoosh = safeIdx === 10;
+    const isWaveStart = safeIdx === 11;
+    const isTierUp = safeIdx === 12;
     const isEvasion = safeIdx === 13;
+    const isMajor = isStreak || isGoldRush || isWaveStart || isTierUp;
 
     const baseColors = [0xff0000, 0xff9900, 0xffff00, 0x00ffff, 0xff5500];
     const streakColors = [0xff2266, 0xff00ff, 0x6600ff, 0xffd700]; // distinctive colors for streaks
@@ -976,12 +981,14 @@ export class SpriteBuilder {
     if (isGoldRush) color = 0xffd700;
     else if (isWhoosh) color = 0x88ccff; // light blue for whoosh
     else if (isEvasion) color = 0x00ff88; // green for evasion
+    else if (isWaveStart) color = 0xff33aa; // hot pink for wave start
+    else if (isTierUp) color = 0xff9900; // bright orange for tier up
     else if (isStreak) color = streakColors[safeIdx - 5];
 
     const star = PoolManager.graphicsPool.acquire();
     
-    const rOuter = (isStreak || isGoldRush) ? 80 : 40;
-    const rInner = (isStreak || isGoldRush) ? 40 : 20;
+    const rOuter = isMajor ? 80 : 40;
+    const rInner = isMajor ? 40 : 20;
 
     star.moveTo(0, -rOuter);
     for (let i = 0; i < 10; i++) {
@@ -992,16 +999,16 @@ export class SpriteBuilder {
     }
     star.lineTo(0, -rOuter);
     star.fill({ color: color });
-    star.stroke({ width: (isStreak || isGoldRush) ? 8 : 5, color: 0x000000, join: "miter" });
+    star.stroke({ width: isMajor ? 8 : 5, color: 0x000000, join: "miter" });
 
     const text = PoolManager.textPool.acquire();
     text.text = texts[safeIdx];
     text.style = new PIXI.TextStyle({
         fontFamily: "Impact, sans-serif",
-        fontSize: (isStreak || isGoldRush) ? 48 : 32,
+        fontSize: isMajor ? 48 : 32,
         fill: 0xffffff,
         align: "center",
-        stroke: { color: 0x000000, width: (isStreak || isGoldRush) ? 8 : 6 },
+        stroke: { color: 0x000000, width: isMajor ? 8 : 6 },
         dropShadow: { alpha: 1, blur: 0, color: 0x000000, distance: 4 },
     });
     
@@ -1042,6 +1049,78 @@ export class SpriteBuilder {
           sprite.circle(p.x + SketchUtils.jitter(0.8), p.y + SketchUtils.jitter(0.8), p.r);
       }
     }
-    sprite.stroke({ width: 3, color: 0x000000, join: 'round', cap: 'round' });
+  }
+
+  static drawBossTitan(container: PIXI.Container) {
+    const TANK_W = 90;
+    const TANK_H = 75;
+    const TRACK_W = 100;
+    const TRACK_H = 20;
+    const BASE_COLOR = 0x4a4f54; // Dark steel military grey
+    const SHADOW_COLOR = 0x222629; // Deep shadows
+    const HIGHLIGHT_COLOR = 0x86c232; // Nuclear radioactive green highlighting!
+    const TRACK_COLOR = 0x202020; // Heavy iron tracks
+    const TRACK_SHADOW = 0x0f0f0f;
+
+    let chassis = container.getChildByName("chassis") as PIXI.Graphics;
+    if (!chassis) {
+      chassis = PoolManager.graphicsPool.acquire();
+      chassis.name = "chassis";
+      container.addChild(chassis);
+    }
+    chassis.clear();
+
+    // 4 Tracks (Heavy dual tracks on each side!)
+    // Left upper track
+    SketchUtils.drawComicBlock(chassis, -10, -42, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x404040);
+    // Left lower track (Dual track system)
+    SketchUtils.drawComicBlock(chassis, 10, -42, TRACK_W - 10, TRACK_H - 2, TRACK_COLOR, TRACK_SHADOW, 0x404040);
+    // Right upper track
+    SketchUtils.drawComicBlock(chassis, -10, 42, TRACK_W, TRACK_H, TRACK_COLOR, TRACK_SHADOW, 0x404040);
+    // Right lower track (Dual track system)
+    SketchUtils.drawComicBlock(chassis, 10, 42, TRACK_W - 10, TRACK_H - 2, TRACK_COLOR, TRACK_SHADOW, 0x404040);
+
+    // Giant armored Hull
+    SketchUtils.drawComicBlock(chassis, 0, 0, TANK_W, TANK_H, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+
+    // Front ram plow (Heavy spikes or armored wedges)
+    chassis.beginPath();
+    chassis.moveTo(TANK_W / 2, -TANK_H / 2 + 10);
+    chassis.lineTo(TANK_W / 2 + 20, 0);
+    chassis.lineTo(TANK_W / 2, TANK_H / 2 - 10);
+    chassis.closePath();
+    chassis.fill({ color: 0x3b3b3b });
+    chassis.stroke({ width: 3.5, color: 0x000000 });
+
+    // Exhaust pipes on the rear
+    SketchUtils.drawComicBlock(chassis, -TANK_W / 2 - 10, -20, 15, 8, 0x1a1a1a, 0x0f0f0f, 0x333333);
+    SketchUtils.drawComicBlock(chassis, -TANK_W / 2 - 10, 20, 15, 8, 0x1a1a1a, 0x0f0f0f, 0x333333);
+
+    let turret = container.getChildByName("turret") as PIXI.Graphics;
+    if (!turret) {
+      turret = PoolManager.graphicsPool.acquire();
+      turret.name = "turret";
+      container.addChild(turret);
+    }
+    turret.clear();
+
+    // Dual Massive Artillery Barrels (placed on the rotating turret)
+    // Left Barrel
+    SketchUtils.drawComicBlock(turret, 45, -12, 60, 12, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+    SketchUtils.drawComicBlock(turret, 75, -12, 12, 16, 0x3a3a3a, 0x1a1a1a, 0x5a5a5a); // Heavy muzzle break
+    
+    // Right Barrel
+    SketchUtils.drawComicBlock(turret, 45, 12, 60, 12, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+    SketchUtils.drawComicBlock(turret, 75, 12, 12, 16, 0x3a3a3a, 0x1a1a1a, 0x5a5a5a); // Heavy muzzle break
+
+    // Giant Turret Base
+    SketchUtils.drawComicCylinder(turret, 0, 0, 32, BASE_COLOR, SHADOW_COLOR, HIGHLIGHT_COLOR);
+
+    // Radioactive glowing core or radar dish in center of turret
+    SketchUtils.drawComicCylinder(turret, -5, 0, 12, 0x86c232, 0x61892f, 0xffffff);
+    
+    // Glowing red power vents/eye
+    SketchUtils.drawSketchCircle(turret, 14, -8, 5, 0xff0000);
+    SketchUtils.drawSketchCircle(turret, 14, 8, 5, 0xff0000);
   }
 }

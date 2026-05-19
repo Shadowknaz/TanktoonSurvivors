@@ -15,6 +15,7 @@ import { EventSystem } from "../ecs/systems/EventSystem";
 import { UpgradeSystem } from "../ecs/systems/UpgradeSystem";
 import { WaveSystem } from "../ecs/systems/WaveSystem";
 import { StickyProjectileSystem } from "../ecs/systems/StickyProjectileSystem";
+import { BossSystem } from "../ecs/systems/BossSystem";
 import { globalEventBus } from "../core/EventBus";
 import { EnemyIndex } from "./EnemyIndex";
 import { AudioEngine } from "./audio/AudioEngine";
@@ -26,6 +27,7 @@ export class SystemManager {
   private renderSystem = new RenderSystem();
   private aiSystem: AISystem;
   private spawnSystem = new SpawnSystem();
+  private bossSystem = new BossSystem();
   private weaponSystem: WeaponSystem;
   private collisionSystem: CollisionSystem;
   private eventSystem: EventSystem;
@@ -64,6 +66,7 @@ export class SystemManager {
       this.enemyIndex.update(world);
 
       this.waveSystem.update(world, deltaTime);
+      this.bossSystem.update(world, physicsEngine, deltaTime, context);
       this.eventSystem.update(world, physicsEngine, deltaTime, context);
       this.spawnSystem.update(world, physicsEngine, deltaTime, context);
       this.inputSystem.update(world, inputViewModel.getState(), deltaTime, context);

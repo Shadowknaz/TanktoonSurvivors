@@ -1,5 +1,6 @@
 import { SpriteId } from "../models/types";
 import { GameConfig } from "./GameConfig";
+import { BossConfig } from "./BossConfig";
 
 export enum EnemyType {
     SHOOTER = "SHOOTER",
@@ -9,7 +10,8 @@ export enum EnemyType {
     SNIPER = "SNIPER",
     GRENADIER = "GRENADIER",
     SAPPER = "SAPPER",
-    FLAMER = "FLAMER"
+    FLAMER = "FLAMER",
+    BOSS_TITAN = "BOSS_TITAN"
 }
 
 export interface EnemyTemplate {
@@ -36,6 +38,7 @@ export interface EnemyTemplate {
     };
     isFlamer?: boolean;
     isSapper?: boolean;
+    isBoss?: boolean;
 }
 
 export const ENEMY_TEMPLATES: Record<EnemyType, EnemyTemplate> = {
@@ -133,5 +136,14 @@ export const ENEMY_TEMPLATES: Record<EnemyType, EnemyTemplate> = {
         height: 46, // matches sprite with tracks (-22 to +22)
         speedModifier: 0.8,
         isFlamer: true
+    },
+    [EnemyType.BOSS_TITAN]: {
+        type: EnemyType.BOSS_TITAN,
+        health: BossConfig.TITAN.BASE_HEALTH,
+        spriteId: SpriteId.BOSS_TITAN,
+        width: BossConfig.TITAN.WIDTH,
+        height: BossConfig.TITAN.HEIGHT,
+        speedModifier: BossConfig.TITAN.BASE_SPEED,
+        isBoss: true
     }
 };

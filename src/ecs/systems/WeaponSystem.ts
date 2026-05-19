@@ -175,6 +175,13 @@ export class WeaponSystem {
     addComponent(world, projEid, MatterBody);
     MatterBody.bodyId[projEid] = body.id;
 
+    if (!Weapon.isArced[shooterId]) {
+      Matter.Body.setVelocity(body, {
+        x: Velocity.x[projEid],
+        y: Velocity.y[projEid]
+      });
+    }
+
     if (isPlayer) {
       physicsEngine.setCollisionFilter(body, CollisionCategory.PLAYER_PROJECTILE, CollisionCategory.WALL | CollisionCategory.ENEMY);
     } else {
@@ -322,7 +329,7 @@ export class WeaponSystem {
           if (bodyId !== undefined) {
             const body = physicsEngine.getBodyById(bodyId);
             if (body) {
-              if (hasComponent(world, eid, Projectile) && PoolManager.projectileBodyPool) {
+              if (hasComponent(world, eid, Projectile) && PoolManager.projectileBodyPool && (body as any).isPooled) {
                  physicsEngine.removeBody(body);
                  // Safe cast: every body in projectileBodyPool is a PooledBody — reset/destroy assigned in initPhysicsPools.
                  PoolManager.projectileBodyPool.release(body as PooledBody);

@@ -13,11 +13,13 @@ import {
   ContactDamage,
   TankTracks,
   Burrowed,
-  FlamerTank
+  FlamerTank,
+  Boss
 } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { CollisionCategory } from "../../config/PhysicsConfig";
 import { EnemyTemplate } from "../../config/EnemyConfig";
+import { BossConfig } from "../../config/BossConfig";
 
 export class EnemyFactory {
   static createEnemy(
@@ -92,6 +94,19 @@ export class EnemyFactory {
       FlamerTank.isSpraying[eid] = 0;
       FlamerTank.fuelLeft[eid] = 100;
       FlamerTank.lastSpray[eid] = 0;
+    }
+
+    if (template.isBoss) {
+      addComponent(world, eid, Boss);
+      Boss.bossType[eid] = 0; // 0 = TITAN
+      Boss.currentPhase[eid] = 1;
+      Boss.phaseHPThreshold[eid] = Health.max[eid] * 0.6; // Transition at 60% max health
+      Boss.actionTimer[eid] = 0;
+      Boss.shieldActive[eid] = 0;
+
+      // Add ContactDamage for physical collisions (ramming/touching player)
+      addComponent(world, eid, ContactDamage);
+      ContactDamage.value[eid] = BossConfig.TITAN.PHASES[1].damage;
     }
 
     const body = physicsEngine.createRectangleBody(x, y, template.width, template.height, {}, eid);

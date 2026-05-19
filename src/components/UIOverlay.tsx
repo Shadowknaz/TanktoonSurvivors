@@ -52,6 +52,77 @@ const useWaveState = () =>
     }))
   );
 
+/** High-frequency: Boss status */
+const useBossState = () =>
+  useGameStore(
+    useShallow((s) => ({
+      bossActive: s.bossActive,
+      bossNameKey: s.bossNameKey,
+      bossHealth: s.bossHealth,
+      bossMaxHealth: s.bossMaxHealth,
+      bossPhase: s.bossPhase,
+    }))
+  );
+
+// ─── Boss Health Bar — premium comic-styled overlay ───────────────────────────
+const BossHealthBar: React.FC<{ isMobile: boolean }> = React.memo(({ isMobile }) => {
+  const { bossActive, bossNameKey, bossHealth, bossMaxHealth, bossPhase } = useBossState();
+
+  if (!bossActive) return null;
+
+  const rawHealthPct = Math.max(0, (bossHealth / bossMaxHealth) * 100);
+  const healthPct = Math.ceil(rawHealthPct / 5) * 5; // Step by 5% for comic aesthetic
+
+  const localizedValue = en[bossNameKey as keyof typeof en];
+  const localizedName = typeof localizedValue === 'string' ? localizedValue : bossNameKey;
+
+  let phaseText = "PHASE I";
+  let phaseColor = "text-green-400";
+  let barColor = "bg-green-500 animate-pulse";
+  
+  if (bossPhase === 2) {
+    phaseText = "PHASE II: SYSTEM OVERHEAT";
+    phaseColor = "text-yellow-400 animate-pulse";
+    barColor = "bg-yellow-500";
+  } else if (bossPhase === 3) {
+    phaseText = "PHASE III: TITAN RAM OVERDRIVE!";
+    phaseColor = "text-red-500 font-bold animate-bounce";
+    barColor = "bg-red-600";
+  }
+
+  return (
+    <div className={`absolute top-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none z-30 transition-all ${isMobile ? 'scale-75' : ''}`}>
+      <div className="bg-[#1b1c1e] border-[6px] border-black p-3 shadow-[8px_8px_0_0_rgba(0,0,0,1)] relative transform skew-x-3 -rotate-1">
+        
+        {/* Name and Phase details */}
+        <div className="flex justify-between items-end mb-2 px-1 relative z-10">
+          <span className="font-black text-white text-2xl uppercase tracking-tighter drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">
+            {localizedName}
+          </span>
+          <span className={`font-black font-mono text-xs uppercase tracking-widest ${phaseColor}`}>
+            {phaseText}
+          </span>
+        </div>
+
+        {/* Health Bar track */}
+        <div className="w-full bg-black h-8 border-4 border-black relative overflow-hidden shadow-inner">
+          <div
+            className={`h-full transition-all duration-300 ease-out ${barColor}`}
+            style={{ width: `${healthPct}%` }}
+          />
+          <div
+            className="absolute inset-0 flex items-center justify-center text-white font-mono font-black text-sm uppercase tracking-wider drop-shadow-md"
+            style={{ WebkitTextStroke: '1px black' }}
+          >
+            {Math.ceil(bossHealth)} / {bossMaxHealth} ({healthPct}%)
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+BossHealthBar.displayName = 'BossHealthBar';
+
 // ─── Wave info — isolated sub-component for high-frequency wave data ─────────
 const WaveInfo: React.FC<{ isMobile: boolean }> = ({ isMobile }) => {
   const { currentWave, currentTier, score, survivalTime } = useWaveState();
@@ -183,6 +254,9 @@ export const UIOverlay: React.FC = () => {
       {isGoldRush && (
         <div className="absolute inset-0 bg-yellow-400/20 mix-blend-color pointer-events-none z-10" />
       )}
+
+      {/* Boss Health Bar HUD */}
+      <BossHealthBar isMobile={isMobile} />
 
       <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between z-20">
         {/* Gold Rush Timer */}

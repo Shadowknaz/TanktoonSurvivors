@@ -28,7 +28,7 @@ export class StickyProjectileSystem {
       }
 
       // Update position to follow target
-      StickyProjectileService.updatePosition(world, eid, this.physicsEngine);
+      StickyProjectileService.updatePosition(world, eid, this.physicsEngine, this.context, this.eventBus);
 
       // Check if timer expired
       if (StickyProjectile.timer[eid] <= 0) {

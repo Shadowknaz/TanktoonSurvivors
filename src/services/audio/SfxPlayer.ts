@@ -289,6 +289,18 @@ export class SfxPlayer {
   }
 
   /**
+   * Computes trigger time with variation, ensuring it's never less than current time.
+   * Prevents Tone.js oscillator start time errors when timeVar is negative.
+   */
+  private computeTriggerTime(now: number): number {
+    const timeVar = RandomUtils.randomRange(
+      AudioConfig.VARIATION.time.min,
+      AudioConfig.VARIATION.time.max,
+    );
+    return Math.max(now, now + timeVar);
+  }
+
+  /**
    * Triggers a one-shot SFX by preset name.
    * Applies micro-variation (pitch, timing, gain) to avoid robotic repetition.
    */
@@ -323,16 +335,12 @@ export class SfxPlayer {
       AudioConfig.VARIATION.pitch.min,
       AudioConfig.VARIATION.pitch.max,
     );
-    const timeVar = RandomUtils.randomRange(
-      AudioConfig.VARIATION.time.min,
-      AudioConfig.VARIATION.time.max,
-    );
     const gainVar = RandomUtils.randomRange(
       AudioConfig.VARIATION.gain.min,
       AudioConfig.VARIATION.gain.max,
     );
 
-    const triggerTime = now + timeVar;
+    const triggerTime = this.computeTriggerTime(now);
 
     // Update filter if sweep is configured
     if ("filterSweep" in cfg && cfg.filterSweep) {
@@ -390,12 +398,8 @@ export class SfxPlayer {
       AudioConfig.VARIATION.gain.min,
       AudioConfig.VARIATION.gain.max
     );
-    const timeVar = RandomUtils.randomRange(
-      AudioConfig.VARIATION.time.min,
-      AudioConfig.VARIATION.time.max
-    );
 
-    const triggerTime = now + timeVar;
+    const triggerTime = this.computeTriggerTime(now);
 
     // --- 1. Crack (Удар) ---
     this.shotCrack.volume.setValueAtTime(cfg.crack.volume + gainVar, triggerTime);
@@ -423,12 +427,8 @@ export class SfxPlayer {
       AudioConfig.VARIATION.gain.min,
       AudioConfig.VARIATION.gain.max
     );
-    const timeVar = RandomUtils.randomRange(
-      AudioConfig.VARIATION.time.min,
-      AudioConfig.VARIATION.time.max
-    );
 
-    const triggerTime = now + timeVar;
+    const triggerTime = this.computeTriggerTime(now);
 
     // 1. Удар о броню (лязг металла)
     this.hitArmor.volume.setValueAtTime(cfg.armor.volume + gainVar, triggerTime);
@@ -450,12 +450,8 @@ export class SfxPlayer {
       AudioConfig.VARIATION.gain.min,
       AudioConfig.VARIATION.gain.max
     );
-    const timeVar = RandomUtils.randomRange(
-      AudioConfig.VARIATION.time.min,
-      AudioConfig.VARIATION.time.max
-    );
 
-    const triggerTime = now + timeVar;
+    const triggerTime = this.computeTriggerTime(now);
 
     // 1. Детонация боекомплекта (Boom)
     this.expBoomNoise.volume.setValueAtTime(cfg.boom.volume + gainVar, triggerTime);

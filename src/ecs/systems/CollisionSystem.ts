@@ -22,11 +22,12 @@ import {
   FlamerTank,
   GameState,
   PlayerStats,
-  Chain
+  Chain,
+  Boss
 } from "../components";
 import { WaveConfig, getCurrentTier } from "../../config/WaveConfig";
 import { EventBus } from "../../core/EventBus";
-import { ScoreChangedEvent, PlaySfxEvent } from "../../models/events";
+import { ScoreChangedEvent, PlaySfxEvent, BossHealthChangedEvent, BossDefeatedEvent } from "../../models/events";
 import {
   removeEntity,
   hasComponent,
@@ -46,6 +47,7 @@ import { EnemyIndex } from "../../services/EnemyIndex";
 import { EntityUtils } from "../../utils/EntityUtils";
 import { EvasionService, HitOutcome } from "../../services/EvasionService";
 import { StickyProjectileService } from "../../services/StickyProjectileService";
+import { LootFactory } from "../factories/LootFactory";
 
 type KillStreakThreshold = { kills: number, text: ComicTextType, shake: number };
 
@@ -66,7 +68,15 @@ export class CollisionSystem {
     this.eventBus = eventBus;
   }
 
-  private static handleEnemyKill(world: World, context: GameContext, x: number, y: number, ownerType: OwnerType, eventBus: EventBus) {
+  private static handleEnemyKill(
+    world: World,
+    physicsEngine: PhysicsEngine,
+    context: GameContext,
+    x: number,
+    y: number,
+    ownerType: OwnerType,
+    eventBus: EventBus
+  ) {
     let xpMultiplier = 1;
 
     const gs = EntityUtils.getGameState(world);
@@ -76,6 +86,11 @@ export class CollisionSystem {
     if (playerEid && ownerType === OwnerType.PLAYER) {
         if (PlayerStats.hasAdrenaline[playerEid]) {
             PlayerBuffs.adrenalineTimer[playerEid] = GameConfig.SYNERGY_ADRENALINE_DURATION_SEC;
+        }
+
+        const dropChance = PlayerStats.scrapDropChance[playerEid];
+        if (dropChance > 0 && RandomUtils.random() < dropChance) {
+            LootFactory.createLootDrop(world, physicsEngine, eventBus, x, y, EventConfig.LOOT_TYPES.REPAIR_PART);
         }
     }
 
@@ -144,7 +159,7 @@ export class CollisionSystem {
         }
 
         const isEidPlayer = hasComponent(world, eid, PlayerControlled);
-        if (isEidPlayer && (Health.current[eid] <= 0 || context.isGameOver)) {
+        if (isEidPlayer && (Health.current[eid] <= 0 || (context && context.isGameOver))) {
             continue;
         }
         const isEidEnemy = hasComponent(world, eid, AIBehavior);
@@ -215,15 +230,16 @@ export class CollisionSystem {
                     }
 
                     Health.current[eid] -= finalDamage;
+                    if (hasComponent(world, eid, Boss)) {
+                        eventBus.publish(new BossHealthChangedEvent(Health.current[eid], Health.max[eid]));
+                        if (Health.current[eid] <= 0) {
+                            eventBus.publish(new BossDefeatedEvent());
+                        }
+                    }
                     addComponent(world, eid, DamageFlash);
                     DamageFlash.timer[eid] = GameConfig.DAMAGE_FLASH_FRAMES;
                     
-                    if (ownerType === OwnerType.PLAYER && isEidEnemy && playerEid !== -1 && PlayerStats.lifeStealChance[playerEid] > 0) {
-                        if (RandomUtils.random() < PlayerStats.lifeStealChance[playerEid]) {
-                            Health.current[playerEid] = Math.min(Health.current[playerEid] + 5, Health.max[playerEid]);
-                            EffectFactory.spawnParticleBubble(world, Position.x[eid], Position.y[eid]);
-                        }
-                    }
+                    // Removed old lifesteal check
 
                     if (isEidPlayer) {
                         if (hasComponent(world, eid, PlayerBuffs)) {
@@ -236,7 +252,7 @@ export class CollisionSystem {
                             context.setGameOver(true);
                         } else if (isEidEnemy) {
                             if (ownerType === OwnerType.PLAYER) {
-                                CollisionSystem.handleEnemyKill(world, context, Position.x[eid], Position.y[eid], ownerType, eventBus);
+                                CollisionSystem.handleEnemyKill(world, physicsEngine, context, Position.x[eid], Position.y[eid], ownerType, eventBus);
                             }
                             if (hasComponent(world, eid, FlamerTank)) {
                                 CollisionSystem.applyAOEDamage(world, physicsEngine, Position.x[eid], Position.y[eid], 100, 50, OwnerType.ENEMY, context, eventBus, processed);
@@ -274,7 +290,7 @@ export class CollisionSystem {
     if (bodyId !== undefined) {
       const body = physicsEngine.getBodyById(bodyId);
       if (body) {
-        if (hasComponent(world, eid, Projectile) && PoolManager.projectileBodyPool) {
+        if (hasComponent(world, eid, Projectile) && PoolManager.projectileBodyPool && (body as any).isPooled) {
             physicsEngine.removeBody(body);
             PoolManager.projectileBodyPool.release(body as any);
         } else {
@@ -374,6 +390,10 @@ export class CollisionSystem {
             PlayerBuffs.speedTimer[targetEid] = EventConfig.LOOT_SPEED_DURATION;
         } else if (type === 1) {
             PlayerBuffs.invulnTimer[targetEid] = EventConfig.LOOT_INVULN_DURATION;
+        } else if (type === 2) {
+            const healAmt = EventConfig.LOOT_REPAIR_PART_HEAL;
+            Health.current[targetEid] = Math.min(Health.current[targetEid] + healAmt, Health.max[targetEid]);
+            EffectFactory.spawnParticleBubble(world, Position.x[targetEid], Position.y[targetEid]);
         }
         EffectFactory.spawnComicEffect(world, Position.x[targetEid], Position.y[targetEid] - 40, ComicTextType.POW);
         this.destroyEntity(world, physicsEngine, sourceEid);
@@ -485,15 +505,16 @@ export class CollisionSystem {
             }
 
             Health.current[targetEid] -= finalDamage;
+            if (hasComponent(world, targetEid, Boss)) {
+                this.eventBus.publish(new BossHealthChangedEvent(Health.current[targetEid], Health.max[targetEid]));
+                if (Health.current[targetEid] <= 0) {
+                    this.eventBus.publish(new BossDefeatedEvent());
+                }
+            }
             addComponent(world, targetEid, DamageFlash);
             DamageFlash.timer[targetEid] = GameConfig.DAMAGE_FLASH_FRAMES;
             
-            if (ownerType === OwnerType.PLAYER && isTargetEnemy && playerEid !== -1 && PlayerStats.lifeStealChance[playerEid] > 0) {
-                if (RandomUtils.random() < PlayerStats.lifeStealChance[playerEid]) {
-                    Health.current[playerEid] = Math.min(Health.current[playerEid] + 5, Health.max[playerEid]);
-                    EffectFactory.spawnParticleBubble(world, Position.x[targetEid], Position.y[targetEid]);
-                }
-            }
+            // Removed old lifesteal check
 
             if (isTargetPlayer) {
                 if (hasComponent(world, targetEid, PlayerBuffs)) {
@@ -505,7 +526,7 @@ export class CollisionSystem {
                 if (isTargetPlayer) {
                     context.setGameOver(true);
                 } else if (ownerType === OwnerType.PLAYER && isTargetEnemy) {
-                    CollisionSystem.handleEnemyKill(world, context, Position.x[targetEid], Position.y[targetEid], ownerType, this.eventBus);
+                    CollisionSystem.handleEnemyKill(world, physicsEngine, context, Position.x[targetEid], Position.y[targetEid], ownerType, this.eventBus);
                 }
                 this.destroyEntity(world, physicsEngine, targetEid);
             }
@@ -516,29 +537,16 @@ export class CollisionSystem {
         if (isSourceProjectile) {
             this.eventBus.publish(new PlaySfxEvent('hit', Position.x[targetEid], Position.y[targetEid]));
         }
-        // Handle sticky projectiles for player
-        if (isSourceProjectile && ownerType === OwnerType.PLAYER && playerEid !== -1 && PlayerStats.hasSticky[playerEid] && isTargetEnemy) {
-            StickyProjectileService.stickToTarget(world, physicsEngine, sourceEid, targetEid, damage);
-            impact = false; // Don't destroy projectile, it becomes sticky
-        } else if (hasComponent(world, sourceEid, Explosive)) {
-            const radius = Explosive.radius[sourceEid];
-            const px = Position.x[sourceEid];
-            const py = Position.y[sourceEid];
 
-            CollisionSystem.applyAOEDamage(world, physicsEngine, px, py, radius, damage, ownerType, context, this.eventBus);
+        // We only do projectile special logics (Pierce, Chain, Sticky) for actual projectiles
+        let projectileHandled = false;
 
-            const blastText = hasComponent(world, sourceEid, Kamikaze) ? ComicTextType.BOOM : ComicTextType.POW;
-            EffectFactory.spawnComicEffect(world, px, py, blastText);
-        } else {
-            const effectType = hasComponent(world, sourceEid, Rammer) ? ComicTextType.CRASH : undefined;
-            EffectFactory.spawnComicEffect(world, Position.x[sourceEid], Position.y[sourceEid], effectType);
-        }
-        
-        if (isSourceProjectile || hasComponent(world, sourceEid, Rammer) || hasComponent(world, sourceEid, Kamikaze) || hasComponent(world, sourceEid, Landmine)) {
-            if (isSourceProjectile && hasComponent(world, sourceEid, Pierce) && Pierce.count[sourceEid] > 0 && !isTargetWall) {
-                // Penetrate enemy, don't destroy projectile
+        if (isSourceProjectile) {
+            // Priority 1: Pierce
+            if (hasComponent(world, sourceEid, Pierce) && Pierce.count[sourceEid] > 0 && !isTargetWall) {
                 Pierce.count[sourceEid] -= 1;
-                
+                projectileHandled = true;
+
                 // Ricochet synergy
                 if (ownerType === OwnerType.PLAYER && playerEid !== -1 && PlayerStats.hasRicochet[playerEid]) {
                     const px = Position.x[targetEid];
@@ -559,9 +567,12 @@ export class CollisionSystem {
                         }
                     }
                 }
-            } else if (isSourceProjectile && hasComponent(world, sourceEid, Chain) && Chain.count[sourceEid] > 0 && !isTargetWall) {
+            }
+            // Priority 2: Chain
+            else if (hasComponent(world, sourceEid, Chain) && Chain.count[sourceEid] > 0 && !isTargetWall) {
                 Chain.count[sourceEid] -= 1;
-                
+                projectileHandled = true;
+
                 const px = Position.x[targetEid];
                 const py = Position.y[targetEid];
                 const nearestEnemy = this.enemyIndex.getNearestEnemy(px, py, GameConfig.MAP_WIDTH, targetEid);
@@ -585,12 +596,36 @@ export class CollisionSystem {
                         EffectFactory.spawnParticleBubble(world, px, py);
                     }
                 } else {
-                    if (hasComponent(world, sourceEid, Health)) {
-                        Health.current[sourceEid] = 0;
-                    }
-                    this.destroyEntity(world, physicsEngine, sourceEid);
+                    // No chain target found, destroy projectile
+                    projectileHandled = false;
                 }
+            }
+            // Priority 3: Sticky
+            else if (ownerType === OwnerType.PLAYER && playerEid !== -1 && PlayerStats.hasSticky[playerEid] && isTargetEnemy) {
+                StickyProjectileService.stickToTarget(world, physicsEngine, sourceEid, targetEid, damage);
+                projectileHandled = true;
+                impact = false; // Don't destroy projectile, it becomes sticky
+            }
+        }
+
+        // If it's not a projectile, or it's a projectile that wasn't handled by Pierce/Chain/Sticky (i.e. it must explode or be destroyed)
+        if (!projectileHandled) {
+            if (hasComponent(world, sourceEid, Explosive)) {
+                const radius = Explosive.radius[sourceEid];
+                const px = Position.x[sourceEid];
+                const py = Position.y[sourceEid];
+
+                CollisionSystem.applyAOEDamage(world, physicsEngine, px, py, radius, damage, ownerType, context, this.eventBus);
+
+                const blastText = hasComponent(world, sourceEid, Kamikaze) ? ComicTextType.BOOM : ComicTextType.POW;
+                EffectFactory.spawnComicEffect(world, px, py, blastText);
             } else {
+                const effectType = hasComponent(world, sourceEid, Rammer) || hasComponent(world, sourceEid, Boss) ? ComicTextType.CRASH : undefined;
+                EffectFactory.spawnComicEffect(world, Position.x[sourceEid], Position.y[sourceEid], effectType);
+            }
+
+            // Destroy the source entity if it should be destroyed on impact
+            if (isSourceProjectile || hasComponent(world, sourceEid, Rammer) || hasComponent(world, sourceEid, Kamikaze) || hasComponent(world, sourceEid, Landmine)) {
                 if (hasComponent(world, sourceEid, Health)) {
                     Health.current[sourceEid] = 0;
                 }

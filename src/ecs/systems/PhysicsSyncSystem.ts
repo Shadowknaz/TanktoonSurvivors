@@ -1,5 +1,5 @@
 import { query, hasComponent, World, removeComponent, removeEntity } from "bitecs";
-import { MatterBody, Position, Velocity, PlayerControlled, AIBehavior, Airdrop, ArcedProjectile } from "../components";
+import { MatterBody, Position, Velocity, PlayerControlled, AIBehavior, Airdrop, ArcedProjectile, Projectile } from "../components";
 import { PhysicsEngine } from "../../services/PhysicsEngine";
 import { EffectFactory } from "../factories/EffectFactory";
 import { GameConfig } from "../../config/GameConfig";
@@ -73,6 +73,9 @@ export class PhysicsSyncSystem {
             y: targetVy + latVy * GameConfig.PHYSICS_LATERAL_DAMPING 
         });
       }
+
+      // Projectiles are driven purely by their initial velocity, not continuous forces
+      if (hasComponent(world, eid, Projectile)) continue;
 
       const massFactor = body.mass;
       const forceX = Velocity.x[eid] * deltaTime * GameConfig.PHYSICS_FORCE_MULT * massFactor; 

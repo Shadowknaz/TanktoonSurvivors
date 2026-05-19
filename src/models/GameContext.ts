@@ -7,12 +7,12 @@ export interface PlayerStats {
     hasAutoGun: boolean;
     explosiveRadius: number;
     multishotCount: number;
-    lifeStealChance: number;
+    scrapDropChance: number;
     pierceCount: number;
     evasionChance: number;
     critChance: number;
     hasNapalmMinigun: boolean;
-    hasVampiricArmor: boolean;
+    hasScrapArmor: boolean;
 }
 
 export interface BuffState {

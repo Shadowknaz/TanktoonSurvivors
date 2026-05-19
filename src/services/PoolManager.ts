@@ -80,6 +80,7 @@ export class PoolManager {
                 friction: 0,
                 restitution: 0.5,
             }) as PooledBody;
+            (body as any).isPooled = true;
 
             body.reset = function() {
                 if (this.currentScale !== undefined && this.currentScale !== 1.0) {

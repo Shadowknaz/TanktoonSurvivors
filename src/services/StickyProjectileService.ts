@@ -59,10 +59,17 @@ export class StickyProjectileService {
     removeEntity(world, stickyEid);
   }
 
-  static updatePosition(world: World, stickyEid: number, physicsEngine: PhysicsEngine): void {
+  static updatePosition(
+    world: World,
+    stickyEid: number,
+    physicsEngine: PhysicsEngine,
+    context: GameContext,
+    eventBus: EventBus
+  ): void {
     const targetEid = StickyProjectile.targetEid[stickyEid];
     if (targetEid === 0 || !hasComponent(world, targetEid, Position)) {
       // Target is dead, detonate immediately
+      this.detonate(world, physicsEngine, stickyEid, context, eventBus);
       return;
     }
 
